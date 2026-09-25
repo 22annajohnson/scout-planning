@@ -191,6 +191,88 @@ Decision success uses `result`; UI success uses `template/components`; failure u
 - [ ] Ship native renderers before enabling templates that need them; deploy backend fixtures/templates, flag a cohort, monitor mapping failures/latency/action errors. Roll back template revision or flag without breaking released clients; retain compatible schema versions.
 - [ ] Done: reviewed contracts, all selected components registered, provider/consumer/security checks and human UI acceptance. This PR changes plans only.
 
+## Ticket breakdown and story points
+
+**Draft tickets, not created Jira issues.** Create them after plan approval. Ticket IDs below are local planning references, not Jira keys.
+
+| Points | Developer time |
+| --- | --- |
+| 0.25 | 2 hours |
+| 0.5 | 4 hours |
+| 0.75 | 6 hours |
+| 1 | 8 hours |
+| 1.25 | 10 hours |
+| 1.5 | 12 hours |
+| 1.75 | 14 hours |
+| 2 | 16 hours |
+
+Estimates represent human developer time from implementation through focused tests, review fixes and handoff, not AI runtime. They exclude waiting for approval/CI/review and unresolved product research. No ticket may exceed **2 points**; if discovery expands scope, split it before implementation. Each 0.25-point increment is 2 developer hours. Section totals may exceed 2 because they contain multiple tickets.
+
+This plan owns shared BFF/registry infrastructure and photo-policy/experiment plumbing. The design plan owns Swipe-specific component implementations, parameter schemas, data projection, business decisions and screen integration. Infrastructure tickets use fixtures/mock domain handlers; do not count production Swipe handlers here. Other tab implementations remain out of scope.
+
+### Section effort summary
+
+| Section | iOS points | BE points | Total points | Dev hours |
+| --- | ---: | ---: | ---: | ---: |
+| Contract and template foundation | 0.75 | 2 | 2.75 | 22 |
+| Backend composition infrastructure | 0 | 5 | 5 | 40 |
+| iOS rendering infrastructure | 7.5 | 0 | 7.5 | 60 |
+| Photo policy and experiment infrastructure | 0.75 | 4.25 | 5 | 40 |
+| Compatibility and release validation | 1.75 | 1.25 | 3 | 24 |
+| **Total** | **10.75** | **12.5** | **23.25** | **186** |
+
+### Contract and template foundation
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| BFF-01 | [BE] Define envelope and component-node schemas | 1 | 8 | Version fields, stable IDs, child slots, limits and error envelope; valid/invalid fixtures. |
+| BFF-02 | [BE] Define template bindings and reusable defaults | 1 | 8 | Allowlisted bindings, component defaults, template revision schema and repeated-node fixtures. |
+| BFF-03 | [iOS] Define capability manifest and transport DTOs | 0.75 | 6 | Supported item/version manifest and envelope/header DTOs matching shared fixtures. |
+
+### Backend composition infrastructure
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| BFF-04 | [BE] Build template binding resolver | 1.5 | 12 | Resolve approved projection fields and missing-value policy; no arbitrary field lookup. |
+| BFF-05 | [BE] Build tree assembly and schema validation | 1.5 | 12 | Ordered children, namespaced IDs, required slots and depth/node validation. |
+| BFF-06 | [BE] Add compatible-template selection | 1 | 8 | Choose template from capability revision; previous compatible revision and unsupported-client error. |
+| BFF-07 | [BE] Add authenticated endpoint and error scaffolding | 1 | 8 | Shared JWT/context handling, response serialization and redacted errors; no Swipe domain projection. |
+
+### iOS rendering infrastructure
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| BFF-08 | [iOS] Build registry decoder and parameter validation | 1.5 | 12 | Typed item/version dispatch, optional-child isolation and required-slot failures. |
+| BFF-09 | [iOS] Build native renderer and container slots | 1.5 | 12 | Allowlisted renderer lookup, ordered children and native content/overlay/action slot plumbing. |
+| BFF-10 | [iOS] Add Spacer and text primitive adapters | 0.5 | 4 | Fixed spacing tokens, supported text roles and token fallback; no arbitrary styling. |
+| BFF-11 | [iOS] Add state-card adapter and unsupported fallback | 0.5 | 4 | Reuse ScoutStateCard; distinguish empty, malformed and unsupported responses. |
+| BFF-12 | [iOS] Build authenticated BFF transport | 1 | 8 | Cancellation, one session refresh, non-JSON errors and bounded read retry. |
+| BFF-13 | [iOS] Add provider integration and request lifecycle | 1.5 | 12 | Tree result interface, capability negotiation, stale-response rejection and account-scoped cache reset. |
+| BFF-14 | [iOS] Add native action dispatch and retry coordination | 1 | 8 | Allowlisted intents, pending state and stable write idempotency key; mock decision transport. |
+
+### Photo policy and experiment infrastructure
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| BFF-15 | [BE] Implement numeric and session-stable random ordering | 0.75 | 6 | Stable photo IDs, position tie-breaks, seeded session ordering and retry fixtures. |
+| BFF-16 | [BE] Add experiment assignment and policy fallback | 1 | 8 | Stable variant resolver, opaque assignment token and numeric fallback/disable behavior. |
+| BFF-17 | [BE] Add exposure storage and ingestion | 1.5 | 12 | Reviewed migration, authenticated ingestion, deduplication, retention and RLS tests. |
+| BFF-18 | [iOS] Report actual photo exposure | 0.75 | 6 | Visibility-based events with photo/position/session token; avoid payload-delivery counts. |
+| BFF-19 | [BE] Add assignment-to-outcome attribution | 1 | 8 | Join authorized exposure/assignment to durable decision/match IDs; basic metric query and fixtures. |
+
+### Compatibility and release validation
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| BFF-20 | [BE] Add provider contract checks in CI | 0.75 | 6 | Validate canonical fixtures, compiler output and old-client compatible templates. |
+| BFF-21 | [iOS] Add consumer contract checks in CI | 0.75 | 6 | Shared fixtures for malformed/unknown/duplicate/limit cases and renderer fallback. |
+| BFF-22 | [BE] Add template rollout and rollback controls | 0.5 | 4 | Revision flag, diagnostics and rollback procedure preserving supported clients. |
+| BFF-23 | [iOS] Verify renderer accessibility and compatibility | 1 | 8 | Small-screen/large-text slots, required fallback and old/new template integration. |
+
+**Sequence:** Approve schemas and domain decisions → contract foundation → backend/iOS infrastructure → Swipe-specific tickets in design PR #1 → integrated validation. Experiment tickets depend on the carousel and durable decision/match IDs; they can ship behind a separate flag after the base deck.
+
+**Estimate boundary:** assumes approved domain rules, available authorized source data and the existing Supabase/auth/design foundations. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
+
 ## References and conventions
 
 Proposal: thin TypeScript Supabase Edge Functions over Postgres/Auth/Storage; see [Edge Functions](https://supabase.com/docs/guides/functions), [authentication](https://supabase.com/docs/guides/functions/auth), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security). Simple authorized CRUD can remain behind existing repositories.
