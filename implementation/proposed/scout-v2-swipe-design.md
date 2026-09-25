@@ -12,7 +12,7 @@ Build the complete swipe card and its collapsed/expanded navigation. Keep photos
 | **Modification needed** | Existing implementation needs the specific change listed. |
 | **New** | No matching reusable implementation found; the Swift name is a proposal. |
 
-**Baseline:** local ScoutSports source at `0a5a5620de5d7adf8df11069acb0aa278c32ca29`, inspected for this revision. V2 `scout-ios` is README-only: these statuses describe legacy reuse, not completed V2 work. Existing names are exact Swift declarations; **(proposed)** names do not exist yet. Figma was inspected on 2026-09-25. JSON cells are small contract fragments; full examples follow.
+**Baseline:** local ScoutSports source at `0a5a5620de5d7adf8df11069acb0aa278c32ca29`, inspected for this revision. V2 `scout-ios` is README-only: these statuses describe legacy reuse, not completed V2 work. Existing names are exact Swift declarations; **(proposed)** names do not exist yet. Figma was inspected on 2026-09-25. JSON cells below describe component-specific `parameters` fragments; the registry table maps each to its wire `item`. The endpoint returns an ordered component tree, shown below.
 
 ### Navigation, actions and media
 
@@ -26,7 +26,7 @@ Build the complete swipe card and its collapsed/expanded navigation. Keep photos
 | Photo Header | Modification needed | `PlayerBackgroundView` + `SwipeCardIdentitySection` | Photo-to-dark continuous fade, stable identity/distance overlays and right score rail; accessible image fallback | Ordered authorized media | `{"photos":[{"id":"photo_1","url":"https://example.invalid/photo.jpg"}]}` |
 | Photo Carousel | New | `SwipePhotoCarousel` **(proposed)** | Horizontal paging with zero/one/many images; preserve selection; do not trigger deck decision gestures | Same `photos` list | `{"photos":[]}` → placeholder |
 | Carousel Position | New | `SwipeCarouselPosition` **(proposed)** | Photo 1/2/3 examples become data-sized segments and local selected index | None beyond `photos` | — derived from media count/local index |
-| Player Card | Modification needed | `PlayerSwipeScrollView` + `PlayerSwipeCardViewModel` | Assemble photo → vibe → availability → stats → highlights → bio/footer; keep actions outside scroll; replace hardcoded/mock assumptions | `player_card` typed payload | `{"type":"player_card","id":"player_123","payload":{}}` (shape only) |
+| Player Card | Modification needed | `PlayerSwipeScrollView` + `PlayerSwipeCardViewModel` | Assemble photo → vibe → availability → stats → highlights → bio/footer; keep actions outside scroll; replace hardcoded/mock assumptions | Ordered `UserSwipeCard.components` | `{"candidateId":"player_123","revision":"r1"}` (card parameters) |
 
 ### Identity, feedback and availability
 
@@ -51,54 +51,97 @@ All **21 Swipe families** are covered above. The eight trait codes are `friendli
 
 | Component / role | Status | Actual name | Work required | Backend / JSON |
 | --- | --- | --- | --- | --- |
-| Loading / empty / retry fallback | Ready to go | `ScoutStateCard` | Reuse current loading/empty/error states, title/message and action closure; map localized copy | `{"type":"empty_state","id":"discovery_empty","payload":{"reason":"no_candidates"}}` |
+| Loading / empty / retry fallback | Ready to go | `ScoutStateCard` | Reuse current loading/empty/error states, title/message and action closure; map localized copy | `{"reason":"no_candidates"}` (`ScoutStateCard` parameters) |
 | Glass surfaces | Modification needed | `GlassCard` / `ScoutGlassPanel` alias | Parameterize material/radius to match Subtle/Standard/Elevated/Accent; confirm Reduce Transparency fallback | None |
 | Deck header / filter entry | Modification needed | `SwipeHeroTopBar` | Replace large brand header with compact title/filter control; connect approved filters | Filter request, e.g. `{"sportId":"tennis"}` |
-| Deck and scroll viewport | Modification needed | `SwipeDeckScreen`, `SwipeDeckView`, `SwipeCardOverlayScrollLayout` | Typed provider data, bounded viewport, safe-area dock, separate gestures, retry/empty states | `swipe_stack` + pagination; see BFF plan |
-| Section headings / bio / privacy footer | Modification needed | `PlayerSwipeScrollView` composition | Add missing sections in the designed order using existing text styles; no new component needed | `{"bio":"Weeknight doubles are my happy place."}` |
+| Deck and scroll viewport | Modification needed | `SwipeDeckScreen`, `SwipeDeckView`, `SwipeCardOverlayScrollLayout` | Typed provider data, bounded viewport, safe-area dock, separate gestures, retry/empty states | `SwipeDeck` + ordered cards and pagination; see BFF plan |
+| Section headings / bio / privacy footer | Modification needed | `PlayerSwipeScrollView` composition | Add `UserSwipeBio` and `SwipeText` adapters (proposed) for registered identity/bio/headings/footer composition; reuse existing views/styles | `{"bio":"Weeknight doubles are my happy place."}` |
 
 Reuse tokens/icons only after comparing values with Figma; no other complete swipe component has been verified “ready to go.” `ScoutAvatar` and `ScoutTabBar` from the example request are not declared names in the inspected code and are not added as fictional existing components.
 
 Source folders: `Scout/Scout/Swipe/Views`, `Scout/Scout/Swipe/ViewModels`, `Scout/Scout/App`, `Scout/Scout/Design/Components`, `Scout/ScoutDesign/Sources/ScoutDesign/Components` in ScoutSports. `ScoutStateCard` readiness refers to fallback behavior; it is not a claim of visual parity with an undesigned empty screen.
 
-## 2. Example player-card JSON
+## 2. Component composition contract
 
-**Contract proposal:** `version/components` envelope and factory rules are defined in [BFF PR #2](https://github.com/22annajohnson/scout-planning/pull/2). The following is one `player_card` nested inside `swipe_stack.payload.cards`. All values are illustrative; scores and fit thresholds need approval. URLs use a deliberately non-production domain.
+The BFF chooses component order and component-specific parameters. iOS uses an allowlisted registry to render native SwiftUI. This replaces the earlier fixed `player_card.payload` contract. Wire names are stable API identifiers, even when the underlying Swift type has another name.
+
+| Wire `item` (each at component version 1) | Native implementation / parameter contract |
+| --- | --- |
+| `SwipeDeck`, `UserSwipeCard` | Adapt existing deck/card views; deck has `nextCursor`, card has `candidateId`/`revision`; ordered child `components` |
+| `SwipePhotoCarousel` | Proposed carousel; `images[{id,url,expiresAt?}]`, `initialPhotoId`; ordered overlays in optional `components` |
+| `SwipePhotoHeader`, `SwipeCarouselPosition` | Header adapter + proposed position view; header uses `image`; position reads parent carousel selection/count |
+| `UserSwipeBio` | New registry adapter using `SwipeCardIdentitySection`; `name`, optional `age`, `intro`, `sportId`, `skill`, `bio` |
+| `SwipeDistanceChip`, `SwipeScoreHeatRail` | Typed distance `state/value/unit`; score `state/value/max/calculationVersion` |
+| `SwipeCommunityRating`, `SwipeHighlightRow`, `SwipeSportStats` | One rating item; one highlight item; stats object respectively |
+| `SwipeVibeTag`, `SwipeTraitMeter`, `SwipePlayerVibe` | Fit/personality code; trait code/value/max/label; aggregate state/count/confidence plus ordered tag/meter children |
+| `SwipeAvailabilityDay`, `SwipeWeekAvailability`, `SwipeAvailabilityOverlap` | Day windows; week zone/windows; overlap summary + weekly child. Only shared time and optional viewer windows |
+| `SwipeActionButton`, `SwipeActionBar`, `SwipeExpandingNavigation` | Allowlisted `action`, action list, or native tab IDs. Pending/expanded state stays local |
+| `SwipeHeartIcon`, `SwipeBoltIcon` | Native glyph adapters; size token only; action belongs to parent button |
+| `Spacer` | Native fixed gap: `size` token `xs/sm/md/lg`; not an unbounded SwiftUI expanding spacer |
+| `SwipeText`, `ScoutStateCard` | Allowlisted text role + text; or fallback reason. Neither accepts arbitrary styling/code |
+
+Every registry entry needs its own typed parameter DTO, validation, renderer and fixtures. Child slots are defined by the parent schema; not every component can contain arbitrary children. The three new composition adapters (`Spacer`, `UserSwipeBio`, `SwipeText`) are additional implementation work, not additional Figma families.
+
+### Example card endpoint
+
+`GET /v1/swipe/cards/player_123` returns the versioned envelope described in [BFF PR #2](https://github.com/22annajohnson/scout-planning/pull/2), with this card inside its root `components` array. This shortened example demonstrates photo → gap → bio. The production template also includes the feedback, availability, stats and highlights above; the Figma template can place identity inside the carousel overlay slot.
 
 ```json
 {
-  "type": "player_card",
-  "id": "player_123",
-  "payload": {
-    "revision": "r1",
-    "identity": {
-      "displayName": "Maya", "age": 28, "intro": "Good rallies. Better company.",
-      "sportId": "tennis", "skill": {"system": "NTRP", "value": "3.5", "source": "self_rated"}
+  "item": "UserSwipeCard",
+  "id": "card_player_123",
+  "version": 1,
+  "parameters": {
+    "candidateId": "player_123",
+    "revision": "r1"
+  },
+  "components": [
+    {
+      "item": "SwipePhotoCarousel",
+      "id": "photos_player_123",
+      "version": 1,
+      "parameters": {
+        "images": [
+          {
+            "id": "photo_1",
+            "url": "https://example.invalid/1.jpg"
+          },
+          {
+            "id": "photo_2",
+            "url": "https://example.invalid/2.jpg"
+          },
+          {
+            "id": "photo_3",
+            "url": "https://example.invalid/3.jpg"
+          }
+        ],
+        "initialPhotoId": "photo_1"
+      }
     },
-    "photos": [{"id": "photo_1", "url": "https://example.invalid/photo.jpg", "expiresAt": "2026-09-25T18:00:00Z"}],
-    "distance": {"state": "approximate", "value": 2, "unit": "mi"},
-    "scoutScore": {"state": "available", "value": 88, "max": 100, "calculationVersion": "proposal-v1"},
-    "communityRatings": [{"metric": "friendliness", "state": "rated", "value": 4.9, "max": 5, "reviewCount": 24}],
-    "vibe": {
-      "state": "available", "fitCode": "similar_vibe", "personalityCodes": ["goofy"],
-      "explanation": "You both enjoy friendly games with a competitive edge.",
-      "reviewCount": 24, "confidence": "established",
-      "traits": [{"code": "friendliness", "value": 4, "max": 5, "label": "Welcoming"}]
+    {
+      "item": "Spacer",
+      "id": "photo_bio_gap",
+      "version": 1,
+      "parameters": {
+        "size": "md"
+      }
     },
-    "availability": {
-      "state": "available", "timeZone": "America/New_York",
-      "summary": {"band": "limited", "sharedWindowCount": 1, "bestWindowId": "window_1"},
-      "windows": [{"id": "window_1", "date": "2026-09-29", "start": "2026-09-29T22:30:00Z", "end": "2026-09-30T00:00:00Z"}]
-    },
-    "stats": {"format": "doubles", "gamesPlayed": 24, "attendancePercent": 96, "attendanceSampleCount": 25},
-    "highlights": [{"kind": "games", "title": "24 games with the community", "detail": "Tennis · Doubles & singles"}],
-    "bio": "Weeknight doubles are my happy place.",
-    "allowedActions": ["pass", "invite", "connect"]
-  }
+    {
+      "item": "UserSwipeBio",
+      "id": "bio_player_123",
+      "version": 1,
+      "parameters": {
+        "name": "Mia",
+        "age": 28,
+        "intro": "Good rallies. Better company.",
+        "sportId": "tennis"
+      }
+    }
+  ]
 }
 ```
 
-`windows` exposes shared time only. `date` is the start date in the viewer's stated zone; end time may cross midnight. Optional `viewerWindows` can support the viewer's own lane. Ratings, score and overlap bands are supplied by approved server rules, never inferred by the iOS factory. Missing/null metrics remain unknown, not zero.
+Use image objects rather than bare `imageUrls` so selection, refresh and experiments refer to stable photo IDs. iOS renders the returned array order; the backend resolves numeric, randomized or experiment-based ordering before returning it. Menu expansion and selected photo remain local UI state.
 
 ### Decision request example
 
@@ -118,7 +161,7 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 ### iOS
 
 - [ ] Update the components above; fixture every Figma variant, including hidden distance, unrated feedback, no overlap, failed media and no score.
-- [ ] Use provider → DTO/factory → typed model → view model → view. Views do not decode JSON or call Supabase; keep navigation state local.
+- [ ] Use provider → component decoder/registry → typed parameters → native renderer. Add a renderer/schema/fixtures for each new item; views do not decode JSON or call Supabase. Keep interaction state local.
 - [ ] Isolate horizontal photo/day paging from vertical scrolling. Use explicit decision buttons first; deck-swipe thresholds need a product decision.
 - [ ] Keep controls outside the scroll area; preserve card/photo/day/scroll state through menu expansion and tab changes. Do not hide the only route back to navigation.
 - [ ] Add loading, retry, exhausted/filter-empty, offline and pending states. Freeze duplicate actions and retain the card on failure.
@@ -126,7 +169,8 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 
 ### Backend
 
-- [ ] Supply ordered, cursor-paged `player_card` data through a thin TypeScript Supabase BFF; contract details in PR #2.
+- [ ] Supply endpoint-specific ordered component trees through a thin TypeScript Supabase BFF. Compile versioned tab/card templates against client-supported component versions; contract details in PR #2.
+- [ ] Resolve photo-order policy on the server; pin order per deck session and return stable photo IDs/assignment metadata for exposure attribution.
 - [ ] Own eligibility, exclusions, scoring, fit, selected traits, feedback confidence and timezone-safe overlap computation. Do not ship Figma sample values as defaults.
 - [ ] Authenticate caller; enforce RLS/privacy; expose authorized media, approximate location and shared time only. Recheck visibility/blocks/permissions when acting.
 - [ ] Make decisions idempotent; return authoritative outcomes. Use transactional uniqueness for decisions/matches.
