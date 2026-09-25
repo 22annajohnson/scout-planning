@@ -2,6 +2,8 @@
 
 **Status:** Proposed · **Author:** Stephan · **Scope:** iOS + backend · **Design:** [06 / Swipe Card](https://www.figma.com/design/qEktHx6Uo52KgAYNt4VHw3/Scout-V2?node-id=33-2).
 
+**Backend stack:** Java + Spring Boot. All BFF endpoints, template composition and business logic run in the Spring Boot service; Supabase Edge Functions are not used. Database, identity and object-storage providers are separate infrastructure choices; this plan does not require a provider migration.
+
 Build the complete swipe card and its collapsed/expanded navigation. Keep photos, availability browsing and card scrolling independent from Pass / Invite / Connect. Other tab screens and previous explorations are outside this plan.
 
 ## 1. Component status
@@ -155,7 +157,7 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 ### iOS
 
 - [ ] Build the components above; fixture every Figma variant, including hidden distance, unrated feedback, no overlap, failed media and no score.
-- [ ] Use provider → component decoder/registry → typed parameters → native renderer. Add a renderer/schema/fixtures for each new item; views do not decode JSON or call Supabase. Keep interaction state local.
+- [ ] Use provider → component decoder/registry → typed parameters → native renderer. Add a renderer/schema/fixtures for each new item; views do not decode JSON or call backend services directly. Keep interaction state local.
 - [ ] Isolate horizontal photo/day paging from vertical scrolling. Use explicit decision buttons first; deck-swipe thresholds need a product decision.
 - [ ] Keep controls outside the scroll area; preserve card/photo/day/scroll state through menu expansion and tab changes. Do not hide the only route back to navigation.
 - [ ] Add loading, retry, exhausted/filter-empty, offline and pending states. Freeze duplicate actions and retain the card on failure.
@@ -163,10 +165,10 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 
 ### Backend
 
-- [ ] Supply endpoint-specific ordered component trees through a thin TypeScript Supabase BFF. Compile versioned tab/card templates against client-supported component versions; contract details in PR #2.
+- [ ] Supply endpoint-specific ordered component trees through the Java/Spring Boot BFF. Compile versioned tab/card templates against client-supported component versions; contract details in PR #2.
 - [ ] Resolve photo-order policy on the server; pin order per deck session and return stable photo IDs/assignment metadata for exposure attribution.
 - [ ] Own eligibility, exclusions, scoring, fit, selected traits, feedback confidence and timezone-safe overlap computation. Do not ship Figma sample values as defaults.
-- [ ] Authenticate caller; enforce RLS/privacy; expose authorized media, approximate location and shared time only. Recheck visibility/blocks/permissions when acting.
+- [ ] Authenticate callers with Spring Security; enforce service-layer authorization/privacy; expose authorized media, approximate location and shared time only. Recheck visibility/blocks/permissions when acting.
 - [ ] Make decisions idempotent; return authoritative outcomes. Use transactional uniqueness for decisions/matches.
 - [ ] Map fields to approved source tables. Propose missing migrations, indexes, policies and backfills separately; no schema changes in this PR.
 
@@ -273,7 +275,7 @@ This plan owns Swipe feature work. Shared envelope/compiler/registry, Spacer/tex
 
 **Sequence:** Approve field sources/privacy/score/action semantics → shared BFF foundation in PR #2 → feature schemas → components and projections in parallel → templates/handlers → deck integration → feature acceptance. Invite/Connect depend on approved lifecycle rules; experiments are not required to finish the initial deck.
 
-**Estimate boundary:** assumes approved domain rules, available authorized source data and an available Supabase project. V2 app/session/design foundations are explicitly ticketed across these plans. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
+**Estimate boundary:** assumes approved domain rules, available authorized source data and an available Java/Spring Boot service environment with configured database, identity and object storage. V2 app/session/design foundations are explicitly ticketed across these plans. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
 
 ## Convention notes
 

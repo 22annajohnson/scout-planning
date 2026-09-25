@@ -2,6 +2,8 @@
 
 **Status:** Proposed · **Scope:** iOS + backend/BFF · **Design:** [07 / Onboarding](https://www.figma.com/design/qEktHx6Uo52KgAYNt4VHw3/Scout-V2?node-id=143-2).
 
+**Backend stack:** Java + Spring Boot. All BFF endpoints, template composition and business logic run in the Spring Boot service; Supabase Edge Functions are not used. Database, identity and object-storage providers are separate infrastructure choices; this plan does not require a provider migration.
+
 Authenticated account → welcome → basics → location → sport → photo → ready → Swipe Deck. Require name, age and starting sport; location/photo are optional. Defer bio, level, availability, traits, preferences and additional photos to Profile → Edit card. Do not manufacture a community score for a new player.
 
 ## 1. Component status
@@ -39,7 +41,7 @@ Only `OnboardingScreen` and `OnboardingFieldGroup` accept ordered children. Navi
 
 ## 2. Component composition contract
 
-Logical routes are proposals, following the existing BFF plan. Authenticate every request; derive account ID from JWT. Templates compose authorized profile data and a server-owned onboarding state machine, then validate the resolved tree. iOS owns rendering, unsaved edits, permission prompts and picker interaction. No arbitrary field bindings, URLs, code or navigation strings execute on-device.
+Logical routes are Spring Boot REST endpoints, following the existing BFF plan. Spring Security authenticates every request; derive account ID from the verified JWT. Java services own transitions and transactional persistence behind repository boundaries. Templates compose authorized profile data and a server-owned onboarding state machine, then validate the resolved tree. iOS owns rendering, unsaved edits, permission prompts and picker interaction. No arbitrary field bindings, URLs, code or navigation strings execute on-device.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -139,7 +141,7 @@ Validate locally for feedback and independently on the server. Name rules must s
 
 ### iOS
 
-- [ ] Implement inventory DTOs/renderers, `BFFOnboardingRepository`, `OnboardingViewModel` and coordinator using shared registry/session/transport foundations; views never call Supabase directly.
+- [ ] Implement inventory DTOs/renderers, `BFFOnboardingRepository`, `OnboardingViewModel` and coordinator using shared registry/session/transport foundations; views never call backend services directly.
 - [ ] Native location manager handles notDetermined/authorized/denied/restricted, reduced accuracy and no-fix timeout. Request only on tap; denial follows Not now, timeout offers retry/skip. Device permission is not a server-authoritative fact; reconcile on foreground without unexpectedly reopening the flow.
 - [ ] Persist edits and acknowledgements separately; disable duplicate submissions, preserve keyboard focus/values on error, cancel obsolete reads and reconcile uncertain writes using the same key.
 - [ ] Match all eight Figma screen states; scroll with keyboard/Dynamic Type, accessible labels/selected state, non-color progress, 44-point targets, Reduce Motion/Transparency.
@@ -148,8 +150,9 @@ Validate locally for feedback and independently on the server. Name rules must s
 
 ### Backend
 
+- [ ] Implement onboarding controllers and typed Java DTOs in the shared Spring Boot service; keep transition rules, media orchestration and transactions in services behind repository/storage interfaces.
 - [ ] Define versioned schemas/templates for welcome/basics/location/sport/photo/ready, catalog and validation rules; compile only compatible components and return saved-state values.
-- [ ] Add minimal per-account draft/progress persistence, owner-only access/RLS, optimistic revisions and atomic idempotent transitions; reject skipped prerequisites and cross-account access. Keep draft state separate from the published profile.
+- [ ] Add minimal per-account draft/progress persistence, service-enforced owner-only access, optimistic revisions and atomic idempotent transitions; reject skipped prerequisites and cross-account access. Keep draft state separate from the published profile.
 - [ ] At completion project essentials, optional area/cover and explicit unrated state into the starter profile atomically. Repeated completion returns the same outcome; GET reports completed even if the response was lost.
 - [ ] Implement owned media upload/finalize and cleanup; define private location precision/retention and public distance projection. Do not put raw location/name/age/photo URLs in logs or analytics.
 - [ ] Enforce downstream eligibility separately. Skipping optional fields must allow exploration; whether an incomplete profile can appear in results or send invites needs an explicit domain rule.
