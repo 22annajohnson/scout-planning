@@ -193,6 +193,100 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 - [ ] **Release:** backend first, feature-flagged iOS cohort, then expand. Monitor latency/decoding/action errors without profile payloads. Rollback disables the flag without deleting data.
 - [ ] **Done:** every table row implemented or explicitly deferred, real authorized data, passing checks and human acceptance. No implementation tickets created by this proposal.
 
+## Ticket breakdown and story points
+
+**Draft tickets, not created Jira issues.** Create them after plan approval. Ticket IDs below are local planning references, not Jira keys.
+
+| Points | Developer time |
+| --- | --- |
+| 0.25 | 2 hours |
+| 0.5 | 4 hours |
+| 0.75 | 6 hours |
+| 1 | 8 hours |
+| 1.25 | 10 hours |
+| 1.5 | 12 hours |
+| 1.75 | 14 hours |
+| 2 | 16 hours |
+
+Estimates represent human developer time from implementation through focused tests, review fixes and handoff, not AI runtime. They exclude waiting for approval/CI/review and unresolved product research. No ticket may exceed **2 points**; if discovery expands scope, split it before implementation. Each 0.25-point increment is 2 developer hours. Section totals may exceed 2 because they contain multiple tickets.
+
+This plan owns Swipe feature work. Shared envelope/compiler/registry, Spacer/text primitives, generic transport/retries, capability negotiation and photo-order experiments are estimated only in BFF PR #2. Each iOS feature ticket includes its own parameter DTO/renderer adapter and focused checks; the registration ticket wires them together rather than rebuilding them.
+
+### Section effort summary
+
+| Section | iOS points | BE points | Total points | Dev hours |
+| --- | ---: | ---: | ---: | ---: |
+| Component contracts and visual foundations | 1 | 1 | 2 | 16 |
+| Media and identity | 4.25 | 0 | 4.25 | 34 |
+| Feedback, stats and availability | 5.75 | 0 | 5.75 | 46 |
+| Navigation, actions and card integration | 5.5 | 0 | 5.5 | 44 |
+| Swipe backend domain and templates | 0 | 11 | 11 | 88 |
+| Feature acceptance and rollout | 2 | 1.5 | 3.5 | 28 |
+| **Total** | **18.5** | **13.5** | **32** | **256** |
+
+### Component contracts and visual foundations
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-01 | [BE] Define Swipe-specific parameter schemas | 1 | 8 | Schemas/fixtures for the inventory, approved field sources and unavailable states; use shared BFF envelope. |
+| DESIGN-02 | [iOS] Update glass surface variants and tokens | 0.75 | 6 | Required material/radius variants and Reduce Transparency fallback. |
+| DESIGN-03 | [iOS] Match Heart and Bolt glyphs | 0.25 | 2 | Use approved native/vector glyphs with correct stroke/size; verify at action-button size. |
+
+### Media and identity
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-04 | [iOS] Build photo carousel and position indicator | 1.5 | 12 | Paging, stable photo selection, zero/one/many images and position segments. |
+| DESIGN-05 | [iOS] Update photo header and continuous fade | 1 | 8 | Responsive photo/fade composition and overlay slots; media failure state. |
+| DESIGN-06 | [iOS] Add UserSwipeBio and distance adapters | 1 | 8 | Identity/intro/skill/bio mapping, optional age and hidden/approximate distance. |
+| DESIGN-07 | [iOS] Build Scout score heat rail | 0.75 | 6 | Rest/selected/unavailable states, exact-value marker and accessible text. |
+
+### Feedback, stats and availability
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-08 | [iOS] Build community rating and highlight rows | 1 | 8 | Rated/unrated metric tiles and Reliability/Games/Style rows. |
+| DESIGN-09 | [iOS] Update sport-stat tiles | 0.5 | 4 | Format/games/attendance units, null states and responsive layout. |
+| DESIGN-10 | [iOS] Build vibe tags and trait meters | 1.25 | 10 | Six tag variants and eight typed trait-meter variants with accessible equivalents. |
+| DESIGN-11 | [iOS] Update Player Vibe composition | 0.75 | 6 | Fit explanation, selected traits, personality tags, review count and early-feedback state. |
+| DESIGN-12 | [iOS] Build availability day and week browser | 1.5 | 12 | Dated shared intervals, local time, horizontal paging and day selection. |
+| DESIGN-13 | [iOS] Update overlap summary and unavailable states | 0.75 | 6 | Great/Limited/None and unknown states; best-window/week integration without private lanes. |
+
+### Navigation, actions and card integration
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-14 | [iOS] Extract action button and update action dock | 1 | 8 | Pass/Invite/Connect, horizontal/vertical layouts, pending/disabled states and labels. |
+| DESIGN-15 | [iOS] Update expanding five-tab navigation shell | 1.5 | 12 | Menu/dock transition, route IDs, 44-point targets and preserved local state; destination screens excluded. |
+| DESIGN-16 | [iOS] Register Swipe renderers and compose card | 1.5 | 12 | Connect all feature adapters to shared registry; production template order, headings/bio/footer and safe-area slots. |
+| DESIGN-17 | [iOS] Integrate deck pagination and decision outcomes | 1.5 | 12 | Wire shared provider/dispatcher to Swipe screen, loading/retry/offline states and confirmed outcomes. |
+
+### Swipe backend domain and templates
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-18 | [BE] Build authorized identity and media projection | 1.5 | 12 | Direct-card/read paths enforce profile visibility; safe identity, skill, media expiry and approximate location. |
+| DESIGN-19 | [BE] Build public feedback and stats projection | 1.5 | 12 | Approved aggregate sources, public score version, confidence/traits/highlights; unknown states, no new scoring research. |
+| DESIGN-20 | [BE] Build availability overlap projection | 1.5 | 12 | Approved availability sources, viewer zone, dated intersections, summary and DST/midnight cases. |
+| DESIGN-21 | [BE] Build eligible candidate paging | 1.5 | 12 | Eligibility/exclusions, server ordering, viewer/filter/session-bound cursors and exhaustion. |
+| DESIGN-22 | [BE] Add Swipe tab and card templates/endpoints | 1 | 8 | Compile feature projections using shared compiler; compatible native slots and photo-policy integration. |
+| DESIGN-23 | [BE] Add decision persistence and idempotency | 1.5 | 12 | Reviewed constraints/migration, actor/key payload checks, replay and transactional uniqueness. |
+| DESIGN-24 | [BE] Implement Pass and Connect handlers | 1.5 | 12 | Approved semantics, visibility/block rechecks and authoritative result/match behavior. |
+| DESIGN-25 | [BE] Implement Invite handler | 1 | 8 | Approved context validation and invitation outcome; no chat/notification feature implementation. |
+
+### Feature acceptance and rollout
+
+| Ref | Ticket | Points | Dev hours | Scope / acceptance |
+| --- | --- | ---: | ---: | --- |
+| DESIGN-26 | [iOS] Verify component snapshots and accessibility | 1 | 8 | Inventory variants, small screens, Dynamic Type, VoiceOver and motion/transparency fallbacks. |
+| DESIGN-27 | [iOS] Verify device gestures and end-to-end deck flows | 1 | 8 | Nested scrolling, menu persistence, paging, duplicate actions, offline and lost responses. |
+| DESIGN-28 | [BE] Verify Swipe authorization and concurrency | 1 | 8 | Cross-user/direct-card privacy, blocked candidates, cursor changes and concurrent decision integration. |
+| DESIGN-29 | [BE] Enable Swipe feature rollout controls | 0.5 | 4 | Feature-specific flag/metrics, staged enablement and rollback check using shared template infrastructure. |
+
+**Sequence:** Approve field sources/privacy/score/action semantics → shared BFF foundation in PR #2 → feature schemas → components and projections in parallel → templates/handlers → deck integration → feature acceptance. Invite/Connect depend on approved lifecycle rules; experiments are not required to finish the initial deck.
+
+**Estimate boundary:** assumes approved domain rules, available authorized source data and the existing Supabase/auth/design foundations. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
+
 ## Convention notes
 
 Uses legacy Scout `implementation/proposed/` and compact tech-plan sections because V2 planning has no template. Reconcile approved legacy Discovery/Profile plans and `Scout/docs/architecture/API_BOUNDARIES.md` before implementation; no migration approval is implied. V2 owner/roadmap links remain unassigned. Documentation-only validation; no planning CI or app tests in this PR.
