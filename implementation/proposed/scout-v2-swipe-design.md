@@ -6,60 +6,54 @@ Build the complete swipe card and its collapsed/expanded navigation. Keep photos
 
 ## 1. Component status
 
-| Status | Meaning |
-| --- | --- |
-| **Ready to go** | Existing implementation can be reused as-is for the stated role. Still needs V2 integration. |
-| **Modification needed** | Existing implementation needs the specific change listed. |
-| **New** | No matching reusable implementation found; the Swift name is a proposal. |
+**All iOS components are New.** Nothing has been implemented in the V2 `scout-ios` repository. Every Swift name below is a proposed implementation name, even when inspired by legacy Scout code. Legacy code is reference material only; estimates include building and integrating the V2 implementation, not modifying a delivered component.
 
-**Baseline:** local ScoutSports source at `0a5a5620de5d7adf8df11069acb0aa278c32ca29`, inspected for this revision. V2 `scout-ios` is README-only: these statuses describe legacy reuse, not completed V2 work. Existing names are exact Swift declarations; **(proposed)** names do not exist yet. Figma was inspected on 2026-09-25. JSON cells below describe component-specific `parameters` fragments; the registry table maps each to its wire `item`. The endpoint returns an ordered component tree, shown below.
+Figma was inspected on 2026-09-25. JSON cells describe component-specific parameter fragments; the registry table maps each to its wire `item`. The endpoint returns an ordered component tree.
 
 ### Navigation, actions and media
 
-| Figma component | Status | Existing / planned Swift name | Exact iOS change | Backend requirement | Example JSON |
+| Figma component | Status | Proposed Swift name | Exact iOS change | Backend requirement | Example JSON |
 | --- | --- | --- | --- | --- | --- |
-| Expanding Navigation | Modification needed | `ScoutBottomNavigationBar` + `ScoutHomeViewModel` | Existing bubble/bar toggle stays; add five-tab order, left action dock, 44-point targets and state preservation. Current `ScoutHomeTab` has only Swipe/Feed. | None; navigation is local | — local menu state |
-| Action Bar | Modification needed | `ScoutActionDock` | Add horizontal/vertical layouts, pending/disabled states and labels. Replace Boost/Like meaning with approved Invite/Connect callbacks. | Decision endpoint + allowed actions | `{"allowedActions":["pass","invite","connect"]}` |
-| Action Button | New | Private `ScoutActionDock.actionButton` → `SwipeActionButton` **(proposed)** | Extract reusable Pass/Invite/Connect button; match sizes/colors; explicit accessibility labels and pending state | Same decision endpoint, no separate button API | `{"action":"pass","candidateId":"player_123"}` (request fragment) |
-| Icon / Heart | Modification needed | `Image(systemName: "heart")` in `ScoutActionDock` | Retain glyph approach or use exported vector to match Figma stroke/size; no new named wrapper needed | None | — |
-| Icon / Bolt | Modification needed | `Image(systemName: "bolt.fill")` in `ScoutActionDock` | Match outlined Figma bolt; label its action Invite, not Boost | None | — |
-| Photo Header | Modification needed | `PlayerBackgroundView` + `SwipeCardIdentitySection` | Photo-to-dark continuous fade, stable identity/distance overlays and right score rail; accessible image fallback | Ordered authorized media | `{"photos":[{"id":"photo_1","url":"https://example.invalid/photo.jpg"}]}` |
+| Expanding Navigation | New | `ScoutBottomNavigationBar` + `ScoutHomeViewModel` | Build bubble/bar toggle, five-tab routing shell, left action dock, 44-point targets and state preservation. | None; navigation is local | — local menu state |
+| Action Bar | New | `ScoutActionDock` | Add horizontal/vertical layouts, pending/disabled states and labels. Implement approved Pass/Invite/Connect callbacks. | Decision endpoint + allowed actions | `{"allowedActions":["pass","invite","connect"]}` |
+| Action Button | New | `SwipeActionButton` | Build reusable Pass/Invite/Connect button; match sizes/colors; explicit accessibility labels and pending state | Same decision endpoint, no separate button API | `{"action":"pass","candidateId":"player_123"}` (request fragment) |
+| Icon / Heart | New | `Image(systemName: "heart")` in `ScoutActionDock` | Implement native glyph or exported vector to match Figma stroke/size; no new named wrapper needed | None | — |
+| Icon / Bolt | New | `Image(systemName: "bolt.fill")` in `ScoutActionDock` | Match outlined Figma bolt; label its action Invite, not Boost | None | — |
+| Photo Header | New | `PlayerBackgroundView` + `SwipeCardIdentitySection` | Photo-to-dark continuous fade, stable identity/distance overlays and right score rail; accessible image fallback | Ordered authorized media | `{"photos":[{"id":"photo_1","url":"https://example.invalid/photo.jpg"}]}` |
 | Photo Carousel | New | `SwipePhotoCarousel` **(proposed)** | Horizontal paging with zero/one/many images; preserve selection; do not trigger deck decision gestures | Same `photos` list | `{"photos":[]}` → placeholder |
 | Carousel Position | New | `SwipeCarouselPosition` **(proposed)** | Photo 1/2/3 examples become data-sized segments and local selected index | None beyond `photos` | — derived from media count/local index |
-| Player Card | Modification needed | `PlayerSwipeScrollView` + `PlayerSwipeCardViewModel` | Assemble photo → vibe → availability → stats → highlights → bio/footer; keep actions outside scroll; replace hardcoded/mock assumptions | Ordered `UserSwipeCard.components` | `{"candidateId":"player_123","revision":"r1"}` (card parameters) |
+| Player Card | New | `PlayerSwipeScrollView` + `PlayerSwipeCardViewModel` | Assemble photo → vibe → availability → stats → highlights → bio/footer; keep actions outside scroll; use typed parameters and explicit unavailable states | Ordered `UserSwipeCard.components` | `{"candidateId":"player_123","revision":"r1"}` (card parameters) |
 
 ### Identity, feedback and availability
 
-| Figma component | Status | Existing / planned Swift name | Exact iOS change | Backend requirement | Example JSON |
+| Figma component | Status | Proposed Swift name | Exact iOS change | Backend requirement | Example JSON |
 | --- | --- | --- | --- | --- | --- |
-| Identity | Modification needed | `SwipeCardIdentitySection` | Remove score capsule from identity; add intro, sport, skill system/value and provenance; retain optional age | Safe identity, no birth date | `{"identity":{"displayName":"Maya","age":28,"sportId":"tennis"}}` |
-| Distance Chip | New | Distance label currently in `SwipeHeroTopBar` → `SwipeDistanceChip` **(proposed)** | Extract photo-overlay chip with Approximate/Hidden states; hidden means no distance text | Rounded distance/unit or hidden/unavailable | `{"distance":{"state":"approximate","value":2,"unit":"mi"}}` |
-| Community Rating | Modification needed | `RatingsView` → extracted `SwipeCommunityRating` **(proposed)** | Replace star rows with Friendliness/Competitive numeric tiles; Rated/New variants and honest unrated state | Metric, scale, count; no invented score | `{"communityRatings":[{"metric":"friendliness","state":"unrated"}]}` |
+| Identity | New | `SwipeCardIdentitySection` | Build identity with intro, sport, skill system/value and provenance; retain optional age | Safe identity, no birth date | `{"identity":{"displayName":"Maya","age":28,"sportId":"tennis"}}` |
+| Distance Chip | New | `SwipeDistanceChip` | Build photo-overlay chip with Approximate/Hidden states; hidden means no distance text | Rounded distance/unit or hidden/unavailable | `{"distance":{"state":"approximate","value":2,"unit":"mi"}}` |
+| Community Rating | New | `SwipeCommunityRating` | Build Friendliness/Competitive numeric tiles; Rated/New variants and honest unrated state | Metric, scale, count; no invented score | `{"communityRatings":[{"metric":"friendliness","state":"unrated"}]}` |
 | Highlight Row | New | `SwipeHighlightRow` **(proposed)** | Icon/title/detail row; Reliability/Games/Style variants | Public supported highlight kind + copy | `{"highlights":[{"kind":"games","title":"24 games","detail":"Tennis"}]}` |
-| Sport Stats | Modification needed | `SwipeStatHighlightsSection` + `SwipeMetricTileView` | Format/games/attendance row; correct units and unknown values; responsive layout | Counts and attendance denominator | `{"stats":{"format":"doubles","gamesPlayed":24,"attendancePercent":null}}` |
-| Vibe Tag | Modification needed | `SwipeTagPill` | Add leading marker and six variants: Similar vibe, Casual matchup, Tough matchup, Goofy, Finding your vibe, Interesting combo; distinguish fit/personality | Approved fit/personality codes | `{"fitCode":"similar_vibe","personalityCodes":["goofy"]}` (vibe fragment) |
+| Sport Stats | New | `SwipeStatHighlightsSection` + `SwipeMetricTileView` | Format/games/attendance row; correct units and unknown values; responsive layout | Counts and attendance denominator | `{"stats":{"format":"doubles","gamesPlayed":24,"attendancePercent":null}}` |
+| Vibe Tag | New | `SwipeTagPill` | Add leading marker and six variants: Similar vibe, Casual matchup, Tough matchup, Goofy, Finding your vibe, Interesting combo; distinguish fit/personality | Approved fit/personality codes | `{"fitCode":"similar_vibe","personalityCodes":["goofy"]}` (vibe fragment) |
 | Trait Meter | New | `SwipeTraitMeter` **(proposed)** | Segmented labeled bar for all eight traits; text equivalent, no color-only meaning | Trait code/value/scale/label | `{"code":"friendliness","value":4,"max":5,"label":"Welcoming"}` (trait item) |
-| Player Vibe | Modification needed | `SwipeCardMatchupSection` | Replace central matchup score/tiles with fit explanation, selected traits, personality tags and review count; Established/Early feedback | Aggregates + confidence; server-selected traits | `{"vibe":{"state":"insufficient","reviewCount":0,"traits":[]}}` |
-| Availability Day | New | `SwipeAvailabilityDay` **(proposed)** | Dated day view and local-time lanes. `AvailabilityGridView.swift` declares `AvailabilityGridDemo`, not a production day component. | Shared dated intervals + viewer zone | `{"date":"2026-09-29","start":"2026-09-29T22:30:00Z","end":"2026-09-30T00:00:00Z"}` (window item) |
+| Player Vibe | New | `SwipeCardMatchupSection` | Build fit explanation, selected traits, personality tags and review count; Established/Early feedback | Aggregates + confidence; server-selected traits | `{"vibe":{"state":"insufficient","reviewCount":0,"traits":[]}}` |
+| Availability Day | New | `SwipeAvailabilityDay` **(proposed)** | Build dated day view and local-time lanes from approved shared intervals. | Shared dated intervals + viewer zone | `{"date":"2026-09-29","start":"2026-09-29T22:30:00Z","end":"2026-09-30T00:00:00Z"}` (window item) |
 | Week Availability | New | `SwipeWeekAvailability` **(proposed)** | Mon–Sun selection and horizontal paging; initial day from useful overlap, not hardcoded Tuesday | Same overlap windows; no separate request per day | `{"availability":{"state":"available","timeZone":"America/New_York","windows":[]}}` |
-| Availability Overlap | Modification needed | `SwipeBestOverlapTeaser` | Replace score/category bars with shared-window count, best fit and weekly browser; Great/Limited/None variants | Server overlap summary, no client threshold guesses | `{"summary":{"band":"great","sharedWindowCount":3,"bestWindowId":"window_1"}}` (availability fragment) |
+| Availability Overlap | New | `SwipeBestOverlapTeaser` | Build shared-window count, best fit and weekly browser; Great/Limited/None variants | Server overlap summary, no client threshold guesses | `{"summary":{"band":"great","sharedWindowCount":3,"bestWindowId":"window_1"}}` (availability fragment) |
 | Score Heat Rail | New | `SwipeScoreHeatRail` **(proposed)** | Bottom-up 0–100 fill; Rest/Selected tap toggle reveals marker/exact value; unavailable state | Public score + calculation version, separate from ranking | `{"scoutScore":{"state":"available","value":88,"max":100,"calculationVersion":"proposal-v1"}}` |
 
 All **21 Swipe families** are covered above. The eight trait codes are `friendliness`, `competitiveness`, `playfulness`, `skill`, `reliability`, `sportsmanship`, `communication`, `teamwork`. Figma main variants remain linked through the source page; screenshots below show composed results and feedback variants.
 
 ### Shared dependencies and screen composition
 
-| Component / role | Status | Actual name | Work required | Backend / JSON |
+| Component / role | Status | Proposed Swift name | Work required | Backend / JSON |
 | --- | --- | --- | --- | --- |
-| Loading / empty / retry fallback | Ready to go | `ScoutStateCard` | Reuse current loading/empty/error states, title/message and action closure; map localized copy | `{"reason":"no_candidates"}` (`ScoutStateCard` parameters) |
-| Glass surfaces | Modification needed | `GlassCard` / `ScoutGlassPanel` alias | Parameterize material/radius to match Subtle/Standard/Elevated/Accent; confirm Reduce Transparency fallback | None |
-| Deck header / filter entry | Modification needed | `SwipeHeroTopBar` | Replace large brand header with compact title/filter control; connect approved filters | Filter request, e.g. `{"sportId":"tennis"}` |
-| Deck and scroll viewport | Modification needed | `SwipeDeckScreen`, `SwipeDeckView`, `SwipeCardOverlayScrollLayout` | Typed provider data, bounded viewport, safe-area dock, separate gestures, retry/empty states | `SwipeDeck` + ordered cards and pagination; see BFF plan |
-| Section headings / bio / privacy footer | Modification needed | `PlayerSwipeScrollView` composition | Add `UserSwipeBio` and `SwipeText` adapters (proposed) for registered identity/bio/headings/footer composition; reuse existing views/styles | `{"bio":"Weeknight doubles are my happy place."}` |
+| Loading / empty / retry fallback | New | `ScoutStateCard` | Build loading/empty/error states, title/message and retry closure; map localized copy | `{"reason":"no_candidates"}` (`ScoutStateCard` parameters) |
+| Glass surfaces | New | `GlassCard` / `ScoutGlassPanel` | Parameterize material/radius to match Subtle/Standard/Elevated/Accent; confirm Reduce Transparency fallback | None |
+| Deck header / filter entry | New | `SwipeHeroTopBar` | Build compact title/filter control; connect approved filters | Filter request, e.g. `{"sportId":"tennis"}` |
+| Deck and scroll viewport | New | `SwipeDeckScreen`, `SwipeDeckView`, `SwipeCardOverlayScrollLayout` | Typed provider data, bounded viewport, safe-area dock, separate gestures, retry/empty states | `SwipeDeck` + ordered cards and pagination; see BFF plan |
+| Section headings / bio / privacy footer | New | `PlayerSwipeScrollView` composition | Add `UserSwipeBio` and `SwipeText` adapters (proposed) for registered identity/bio/headings/footer composition; build native views and V2 text styles | `{"bio":"Weeknight doubles are my happy place."}` |
 
-Reuse tokens/icons only after comparing values with Figma; no other complete swipe component has been verified “ready to go.” `ScoutAvatar` and `ScoutTabBar` from the example request are not declared names in the inspected code and are not added as fictional existing components.
-
-Source folders: `Scout/Scout/Swipe/Views`, `Scout/Scout/Swipe/ViewModels`, `Scout/Scout/App`, `Scout/Scout/Design/Components`, `Scout/ScoutDesign/Sources/ScoutDesign/Components` in ScoutSports. `ScoutStateCard` readiness refers to fallback behavior; it is not a claim of visual parity with an undesigned empty screen.
+Build V2 typography, spacing, color, glass and icon foundations from the approved design. Legacy implementations can inform design decisions but do not count as completed work or as a prerequisite already available in `scout-ios`.
 
 ## 2. Component composition contract
 
@@ -67,7 +61,7 @@ The BFF chooses component order and component-specific parameters. iOS uses an a
 
 | Wire `item` (each at component version 1) | Native implementation / parameter contract |
 | --- | --- |
-| `SwipeDeck`, `UserSwipeCard` | Adapt existing deck/card views; deck has `nextCursor`, card has `candidateId`/`revision`; ordered child `components` |
+| `SwipeDeck`, `UserSwipeCard` | Build native deck/card views; deck has `nextCursor`, card has `candidateId`/`revision`; ordered child `components` |
 | `SwipePhotoCarousel` | Proposed carousel; `images[{id,url,expiresAt?}]`, `initialPhotoId`; ordered overlays in optional `components` |
 | `SwipePhotoHeader`, `SwipeCarouselPosition` | Header adapter + proposed position view; header uses `image`; position reads parent carousel selection/count |
 | `UserSwipeBio` | New registry adapter using `SwipeCardIdentitySection`; `name`, optional `age`, `intro`, `sportId`, `skill`, `bio` |
@@ -154,13 +148,13 @@ Use image objects rather than bare `imageUrls` so selection, refresh and experim
 }
 ```
 
-The same key is reused on retry. Invite/Connect outcomes and required invitation context must be approved before implementation. Do not map old `onBoost` directly to an unapproved business action.
+The same key is reused on retry. Invite/Connect outcomes and required invitation context must be approved before implementation. Action names must match approved business semantics.
 
 ## 3. Implementation checklist
 
 ### iOS
 
-- [ ] Update the components above; fixture every Figma variant, including hidden distance, unrated feedback, no overlap, failed media and no score.
+- [ ] Build the components above; fixture every Figma variant, including hidden distance, unrated feedback, no overlap, failed media and no score.
 - [ ] Use provider → component decoder/registry → typed parameters → native renderer. Add a renderer/schema/fixtures for each new item; views do not decode JSON or call Supabase. Keep interaction state local.
 - [ ] Isolate horizontal photo/day paging from vertical scrolling. Use explicit decision buttons first; deck-swipe thresholds need a product decision.
 - [ ] Keep controls outside the scroll area; preserve card/photo/day/scroll state through menu expansion and tab changes. Do not hide the only route back to navigation.
@@ -195,97 +189,91 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 
 ## Ticket breakdown and story points
 
-**Draft tickets, not created Jira issues.** Create them after plan approval. Ticket IDs below are local planning references, not Jira keys.
+**Draft tickets, not created Jira issues.** Create them after plan approval. All iOS work is new implementation in V2; no legacy component is assumed available.
 
-| Points | Developer time |
-| --- | --- |
-| 0.25 | 2 hours |
-| 0.5 | 4 hours |
-| 0.75 | 6 hours |
-| 1 | 8 hours |
-| 1.25 | 10 hours |
-| 1.5 | 12 hours |
-| 1.75 | 14 hours |
-| 2 | 16 hours |
+Estimates use the agreed developer-effort scale in 0.25-point increments, including focused tests, review fixes and handoff. Waiting and unresolved product research are excluded. Every ticket must be **2 points or less**; split expanded scope before implementation. Section totals may exceed 2 because they contain multiple tickets.
 
-Estimates represent human developer time from implementation through focused tests, review fixes and handoff, not AI runtime. They exclude waiting for approval/CI/review and unresolved product research. No ticket may exceed **2 points**; if discovery expands scope, split it before implementation. Each 0.25-point increment is 2 developer hours. Section totals may exceed 2 because they contain multiple tickets.
-
-This plan owns Swipe feature work. Shared envelope/compiler/registry, Spacer/text primitives, generic transport/retries, capability negotiation and photo-order experiments are estimated only in BFF PR #2. Each iOS feature ticket includes its own parameter DTO/renderer adapter and focused checks; the registration ticket wires them together rather than rebuilding them.
+This plan owns Swipe feature work. Shared envelope/compiler/registry, Spacer/text primitives, app/bootstrap/session/CI foundations, generic transport/retries, capability negotiation and photo-order experiments are estimated only in BFF PR #2. Each iOS feature ticket includes its own parameter DTO/renderer adapter and focused checks; the registration ticket wires them together rather than rebuilding them.
 
 ### Section effort summary
 
-| Section | iOS points | BE points | Total points | Dev hours |
-| --- | ---: | ---: | ---: | ---: |
-| Component contracts and visual foundations | 1 | 1 | 2 | 16 |
-| Media and identity | 4.25 | 0 | 4.25 | 34 |
-| Feedback, stats and availability | 5.75 | 0 | 5.75 | 46 |
-| Navigation, actions and card integration | 5.5 | 0 | 5.5 | 44 |
-| Swipe backend domain and templates | 0 | 11 | 11 | 88 |
-| Feature acceptance and rollout | 2 | 1.5 | 3.5 | 28 |
-| **Total** | **18.5** | **13.5** | **32** | **256** |
+| Section | iOS points | BE points | Total points |
+| --- | ---: | ---: | ---: |
+| Component contracts and visual foundations | 2.25 | 1 | 3.25 |
+| Media and identity | 5 | 0 | 5 |
+| Feedback, stats and availability | 6.5 | 0 | 6.5 |
+| Navigation, actions and card integration | 9 | 0 | 9 |
+| Swipe backend domain and templates | 0 | 11 | 11 |
+| Feature acceptance and rollout | 2 | 1.5 | 3.5 |
+| **Total** | **24.75** | **13.5** | **38.25** |
 
 ### Component contracts and visual foundations
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-01 | [BE] Define Swipe-specific parameter schemas | 1 | 8 | Schemas/fixtures for the inventory, approved field sources and unavailable states; use shared BFF envelope. |
-| DESIGN-02 | [iOS] Update glass surface variants and tokens | 0.75 | 6 | Required material/radius variants and Reduce Transparency fallback. |
-| DESIGN-03 | [iOS] Match Heart and Bolt glyphs | 0.25 | 2 | Use approved native/vector glyphs with correct stroke/size; verify at action-button size. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [iOS] Build V2 design tokens and typography | 1 | Color/spacing/type/radius tokens, asset setup, accessible semantic styles and preview foundation. |
+| [BE] Define Swipe-specific parameter schemas | 1 | Schemas/fixtures for the inventory, approved field sources and unavailable states; use shared BFF envelope. |
+| [iOS] Build glass surface components and variants | 1 | Required material/radius variants and Reduce Transparency fallback. |
+| [iOS] Build Heart and Bolt glyph assets | 0.25 | Use approved native/vector glyphs with correct stroke/size; verify at action-button size. |
 
 ### Media and identity
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-04 | [iOS] Build photo carousel and position indicator | 1.5 | 12 | Paging, stable photo selection, zero/one/many images and position segments. |
-| DESIGN-05 | [iOS] Update photo header and continuous fade | 1 | 8 | Responsive photo/fade composition and overlay slots; media failure state. |
-| DESIGN-06 | [iOS] Add UserSwipeBio and distance adapters | 1 | 8 | Identity/intro/skill/bio mapping, optional age and hidden/approximate distance. |
-| DESIGN-07 | [iOS] Build Scout score heat rail | 0.75 | 6 | Rest/selected/unavailable states, exact-value marker and accessible text. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [iOS] Build photo carousel and position indicator | 1.5 | Paging, stable photo selection, zero/one/many images and position segments. |
+| [iOS] Build photo header and continuous fade | 1.25 | Responsive photo/fade composition and overlay slots; media failure state. |
+| [iOS] Build identity, UserSwipeBio and distance components | 1.5 | Identity/intro/skill/bio mapping, optional age and hidden/approximate distance. |
+| [iOS] Build Scout score heat rail | 0.75 | Rest/selected/unavailable states, exact-value marker and accessible text. |
 
 ### Feedback, stats and availability
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-08 | [iOS] Build community rating and highlight rows | 1 | 8 | Rated/unrated metric tiles and Reliability/Games/Style rows. |
-| DESIGN-09 | [iOS] Update sport-stat tiles | 0.5 | 4 | Format/games/attendance units, null states and responsive layout. |
-| DESIGN-10 | [iOS] Build vibe tags and trait meters | 1.25 | 10 | Six tag variants and eight typed trait-meter variants with accessible equivalents. |
-| DESIGN-11 | [iOS] Update Player Vibe composition | 0.75 | 6 | Fit explanation, selected traits, personality tags, review count and early-feedback state. |
-| DESIGN-12 | [iOS] Build availability day and week browser | 1.5 | 12 | Dated shared intervals, local time, horizontal paging and day selection. |
-| DESIGN-13 | [iOS] Update overlap summary and unavailable states | 0.75 | 6 | Great/Limited/None and unknown states; best-window/week integration without private lanes. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [iOS] Build community rating and highlight rows | 1 | Rated/unrated metric tiles and Reliability/Games/Style rows. |
+| [iOS] Build sport-stat tiles | 0.75 | Format/games/attendance units, null states and responsive layout. |
+| [iOS] Build vibe tags and trait meters | 1.25 | Six tag variants and eight typed trait-meter variants with accessible equivalents. |
+| [iOS] Build Player Vibe composition | 1 | Fit explanation, selected traits, personality tags, review count and early-feedback state. |
+| [iOS] Build availability day and week browser | 1.5 | Dated shared intervals, local time, horizontal paging and day selection. |
+| [iOS] Build overlap summary and unavailable states | 1 | Great/Limited/None and unknown states; best-window/week integration without private lanes. |
 
 ### Navigation, actions and card integration
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-14 | [iOS] Extract action button and update action dock | 1 | 8 | Pass/Invite/Connect, horizontal/vertical layouts, pending/disabled states and labels. |
-| DESIGN-15 | [iOS] Update expanding five-tab navigation shell | 1.5 | 12 | Menu/dock transition, route IDs, 44-point targets and preserved local state; destination screens excluded. |
-| DESIGN-16 | [iOS] Register Swipe renderers and compose card | 1.5 | 12 | Connect all feature adapters to shared registry; production template order, headings/bio/footer and safe-area slots. |
-| DESIGN-17 | [iOS] Integrate deck pagination and decision outcomes | 1.5 | 12 | Wire shared provider/dispatcher to Swipe screen, loading/retry/offline states and confirmed outcomes. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [iOS] Build action buttons | 0.75 | Pass/Invite/Connect variants, labels, pending/disabled states and focused previews. |
+| [iOS] Build horizontal and vertical action dock | 0.75 | Compose buttons into both layouts; native shell slot and pending-state integration. |
+| [iOS] Build five-tab app routing shell | 1 | Root navigation state, typed routes and placeholder destinations; destination feature screens excluded. |
+| [iOS] Build floating navigation and expanding-menu transition | 1.25 | Menu/dock transition, tab selection, 44-point targets and preserved local state. |
+| [iOS] Build card scroll viewport and feature view models | 1.5 | New native card/deck view models, independent gestures, media selection and safe-area slots. |
+| [iOS] Build deck header and filter entry | 0.75 | Compact title/filter control, typed filter state and accessible sheet/entry integration. |
+| [iOS] Register Swipe renderers and compose card | 1.5 | Connect new feature adapters to shared registry; production template order, headings/bio/footer and safe-area slots. |
+| [iOS] Integrate deck pagination and decision outcomes | 1.5 | Wire shared provider/dispatcher to Swipe screen, loading/retry/offline states and confirmed outcomes. |
 
 ### Swipe backend domain and templates
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-18 | [BE] Build authorized identity and media projection | 1.5 | 12 | Direct-card/read paths enforce profile visibility; safe identity, skill, media expiry and approximate location. |
-| DESIGN-19 | [BE] Build public feedback and stats projection | 1.5 | 12 | Approved aggregate sources, public score version, confidence/traits/highlights; unknown states, no new scoring research. |
-| DESIGN-20 | [BE] Build availability overlap projection | 1.5 | 12 | Approved availability sources, viewer zone, dated intersections, summary and DST/midnight cases. |
-| DESIGN-21 | [BE] Build eligible candidate paging | 1.5 | 12 | Eligibility/exclusions, server ordering, viewer/filter/session-bound cursors and exhaustion. |
-| DESIGN-22 | [BE] Add Swipe tab and card templates/endpoints | 1 | 8 | Compile feature projections using shared compiler; compatible native slots and photo-policy integration. |
-| DESIGN-23 | [BE] Add decision persistence and idempotency | 1.5 | 12 | Reviewed constraints/migration, actor/key payload checks, replay and transactional uniqueness. |
-| DESIGN-24 | [BE] Implement Pass and Connect handlers | 1.5 | 12 | Approved semantics, visibility/block rechecks and authoritative result/match behavior. |
-| DESIGN-25 | [BE] Implement Invite handler | 1 | 8 | Approved context validation and invitation outcome; no chat/notification feature implementation. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [BE] Build authorized identity and media projection | 1.5 | Direct-card/read paths enforce profile visibility; safe identity, skill, media expiry and approximate location. |
+| [BE] Build public feedback and stats projection | 1.5 | Approved aggregate sources, public score version, confidence/traits/highlights; unknown states, no new scoring research. |
+| [BE] Build availability overlap projection | 1.5 | Approved availability sources, viewer zone, dated intersections, summary and DST/midnight cases. |
+| [BE] Build eligible candidate paging | 1.5 | Eligibility/exclusions, server ordering, viewer/filter/session-bound cursors and exhaustion. |
+| [BE] Add Swipe tab and card templates/endpoints | 1 | Compile feature projections using shared compiler; compatible native slots and photo-policy integration. |
+| [BE] Add decision persistence and idempotency | 1.5 | Reviewed constraints/migration, actor/key payload checks, replay and transactional uniqueness. |
+| [BE] Implement Pass and Connect handlers | 1.5 | Approved semantics, visibility/block rechecks and authoritative result/match behavior. |
+| [BE] Implement Invite handler | 1 | Approved context validation and invitation outcome; no chat/notification feature implementation. |
 
 ### Feature acceptance and rollout
 
-| Ref | Ticket | Points | Dev hours | Scope / acceptance |
-| --- | --- | ---: | ---: | --- |
-| DESIGN-26 | [iOS] Verify component snapshots and accessibility | 1 | 8 | Inventory variants, small screens, Dynamic Type, VoiceOver and motion/transparency fallbacks. |
-| DESIGN-27 | [iOS] Verify device gestures and end-to-end deck flows | 1 | 8 | Nested scrolling, menu persistence, paging, duplicate actions, offline and lost responses. |
-| DESIGN-28 | [BE] Verify Swipe authorization and concurrency | 1 | 8 | Cross-user/direct-card privacy, blocked candidates, cursor changes and concurrent decision integration. |
-| DESIGN-29 | [BE] Enable Swipe feature rollout controls | 0.5 | 4 | Feature-specific flag/metrics, staged enablement and rollback check using shared template infrastructure. |
+| Ticket | Points | Scope / acceptance |
+| --- | ---: | --- |
+| [iOS] Verify component snapshots and accessibility | 1 | Inventory variants, small screens, Dynamic Type, VoiceOver and motion/transparency fallbacks. |
+| [iOS] Verify device gestures and end-to-end deck flows | 1 | Nested scrolling, menu persistence, paging, duplicate actions, offline and lost responses. |
+| [BE] Verify Swipe authorization and concurrency | 1 | Cross-user/direct-card privacy, blocked candidates, cursor changes and concurrent decision integration. |
+| [BE] Enable Swipe feature rollout controls | 0.5 | Feature-specific flag/metrics, staged enablement and rollback check using shared template infrastructure. |
 
 **Sequence:** Approve field sources/privacy/score/action semantics → shared BFF foundation in PR #2 → feature schemas → components and projections in parallel → templates/handlers → deck integration → feature acceptance. Invite/Connect depend on approved lifecycle rules; experiments are not required to finish the initial deck.
 
-**Estimate boundary:** assumes approved domain rules, available authorized source data and the existing Supabase/auth/design foundations. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
+**Estimate boundary:** assumes approved domain rules, available authorized source data and an available Supabase project. V2 app/session/design foundations are explicitly ticketed across these plans. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
 
 ## Convention notes
 
