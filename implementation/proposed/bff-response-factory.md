@@ -1,6 +1,8 @@
 # Tech Plan: Component-driven BFF and iOS Factory
 
-**Status:** Proposed · **Author:** Stephan · **First slice:** Swipe · **Scope:** endpoint templates, Supabase BFF and native iOS component registry.
+**Status:** Proposed · **Author:** Stephan · **First slice:** Swipe · **Scope:** endpoint templates, Java/Spring Boot BFF and native iOS component registry.
+
+**Backend stack:** Java + Spring Boot. All BFF endpoints, template composition and business logic run in the Spring Boot service; Supabase Edge Functions are not used. Database, identity and object-storage providers are separate infrastructure choices; this plan does not require a provider migration.
 
 ## 1. What we are building
 
@@ -17,7 +19,7 @@ This replaces the previous fixed `player_card.payload` proposal. There are two c
 
 ## 2. Endpoint templates
 
-Logical routes below are proposals; publish their deployed Edge Function paths in the API contract. One endpoint composes many components; do not create one network request per visual component.
+Logical routes below are proposals; publish their Spring Boot REST paths and service base URL in the API contract. One endpoint composes many components; do not create one network request per visual component.
 
 | Endpoint | Template | Response root / responsibility |
 | --- | --- | --- |
@@ -169,16 +171,17 @@ Decision success uses `result`; UI success uses `template/components`; failure u
 
 ### Backend
 
+- [ ] Implement the BFF as a Java/Spring Boot service with REST controllers, typed request/response DTOs, validated inputs, service/repository boundaries and centralized error-envelope mapping. Configure Spring Security JWT verification and deployment/health checks.
 - [ ] Version component JSON Schemas + tab/card templates + canonical fixtures; define allowed child slots, variants, limits, action codes and required fields.
 - [ ] Build template compiler over privacy-safe domain projections; resolve photo ordering and return component-capability-compatible responses. Validate output before sending.
-- [ ] Verify JWT, caller RLS and visibility/block rules for both tab and direct card endpoints. Return authorized media, approximate location and shared availability only; no DOB, raw reviews or another player's calendar.
+- [ ] Verify JWT with Spring Security and enforce account authorization and visibility/block rules in the service layer for both tab and direct card endpoints. Return authorized media, approximate location and shared availability only; no DOB, raw reviews or another player's calendar.
 - [ ] Own eligibility, ranking, public score, feedback confidence and overlap computations. Keep absent metrics unavailable. Bind cursors to viewer/filters/session/template revision; restart safely when a revision becomes incompatible.
 - [ ] Propose only missing migrations for decisions/idempotency/experiment exposure; include retention, policies, indexes and rollback. Template config stays versioned in code initially.
 
 ### iOS
 
 - [ ] Add registry DTO/validation/renderer + fixtures for every new component version; use native design tokens. Stable IDs preserve state through template changes.
-- [ ] Add repository/provider integration, capability revision and allowlisted action dispatcher; views do not call Supabase or decode raw JSON.
+- [ ] Add repository/provider integration, capability revision and allowlisted action dispatcher; views use repositories rather than calling backend services directly or decoding raw JSON.
 - [ ] Decode off the main actor and publish UI state on it; cancel/ignore stale account/filter responses. Clear account-scoped memory cache at sign-out.
 - [ ] Keep actions pending until confirmed; show offline/stale state and disable writes. Refresh session once on 401; reconcile 403/404/409. Bound 429/5xx retries and honor Retry-After; write retries retain idempotency key.
 - [ ] Add optional-component isolation, required-slot fallback and localized errors, including non-JSON transport failures. Never confuse unsupported content with no candidates.
@@ -217,7 +220,7 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 | --- | ---: | --- |
 | [iOS] Create V2 app project and feature module structure | 1 | Buildable app target, feature/design/data module boundaries, dependency injection and smoke launch. |
 | [iOS] Configure app build and unit-test CI | 0.75 | Shared scheme, dependency resolution, simulator build/test workflow and documented local commands. |
-| [iOS] Build Supabase session and environment foundation | 1.5 | Environment configuration, auth/session service and token refresh integration; no full onboarding UI. |
+| [iOS] Build session and environment foundation | 1.5 | Spring Boot API base URL, identity-provider configuration, auth/session service and token refresh integration; no full onboarding UI. |
 
 ### Contract and template foundation
 
@@ -234,7 +237,7 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 | [BE] Build template binding resolver | 1.5 | Resolve approved projection fields and missing-value policy; no arbitrary field lookup. |
 | [BE] Build tree assembly and schema validation | 1.5 | Ordered children, namespaced IDs, required slots and depth/node validation. |
 | [BE] Add compatible-template selection | 1 | Choose template from capability revision; previous compatible revision and unsupported-client error. |
-| [BE] Add authenticated endpoint and error scaffolding | 1 | Shared JWT/context handling, response serialization and redacted errors; no Swipe domain projection. |
+| [BE] Add authenticated endpoint and error scaffolding | 1 | Spring Boot controllers/DTOs, Spring Security JWT/context handling, centralized errors and service deployment/health configuration; no Swipe domain projection. Re-estimate/split if service bootstrap is not already available. |
 
 ### iOS rendering infrastructure
 
@@ -254,7 +257,7 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 | --- | ---: | --- |
 | [BE] Implement numeric and session-stable random ordering | 0.75 | Stable photo IDs, position tie-breaks, seeded session ordering and retry fixtures. |
 | [BE] Add experiment assignment and policy fallback | 1 | Stable variant resolver, opaque assignment token and numeric fallback/disable behavior. |
-| [BE] Add exposure storage and ingestion | 1.5 | Reviewed migration, authenticated ingestion, deduplication, retention and RLS tests. |
+| [BE] Add exposure storage and ingestion | 1.5 | Reviewed migration, authenticated ingestion, deduplication, retention and account-authorization tests. |
 | [iOS] Report actual photo exposure | 0.75 | Visibility-based events with photo/position/session token; avoid payload-delivery counts. |
 | [BE] Add assignment-to-outcome attribution | 1 | Join authorized exposure/assignment to durable decision/match IDs; basic metric query and fixtures. |
 
@@ -269,10 +272,10 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 
 **Sequence:** Approve schemas and domain decisions → contract foundation → backend/iOS infrastructure → Swipe-specific tickets in design PR #1 → integrated validation. Experiment tickets depend on the carousel and durable decision/match IDs; they can ship behind a separate flag after the base deck.
 
-**Estimate boundary:** assumes approved domain rules, available authorized source data and an available Supabase project. V2 app/session/design foundations are explicitly ticketed across these plans. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
+**Estimate boundary:** assumes approved domain rules, available authorized source data and an available Java/Spring Boot service environment with configured database, identity and object storage. V2 app/session/design foundations are explicitly ticketed across these plans. Missing profile/review/availability systems, new scoring algorithms, historical backfills or new destination screens need separate estimated tickets; do not hide them inside these rows. Cross-plan totals are additive because shared work is assigned once.
 
 ## References and conventions
 
-Proposal: thin TypeScript Supabase Edge Functions over Postgres/Auth/Storage; see [Edge Functions](https://supabase.com/docs/guides/functions), [authentication](https://supabase.com/docs/guides/functions/auth), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security). Future simple authorized CRUD should also use repository boundaries.
+Backend implementation uses Java and Spring Boot in `scout-backend`: REST controllers handle transport, typed DTOs define contracts, services own template composition/business rules and repositories isolate persistence. Spring Security verifies tokens from the configured identity provider; service-layer authorization is required even if database row-level policies also exist. Transactional service boundaries cover coupled writes and idempotency. Deploy as a Spring Boot service. Future authorized CRUD uses the same boundaries.
 
 Uses legacy `implementation/proposed/`; V2 has no template or CI. Reconcile legacy `Scout/docs/architecture/API_BOUNDARIES.md` and Discovery/Profile guidance before implementation. Roadmap/implementation owners remain unassigned. Documentation validation only; no app tests required for this PR.
