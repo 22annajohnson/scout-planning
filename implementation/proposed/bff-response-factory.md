@@ -1,97 +1,181 @@
-# Tech Plan: BFF Response Interpretation and Factory
+# Tech Plan: BFF Response Factory
 
-## Status / Owner / Planning Level
+**Status:** Proposed · **Author:** Stephan · **Scope:** iOS + Supabase backend, starting with Swipe.
 
-Proposed architecture — approval required before implementation tickets. Planning author: Stephan; iOS/backend implementation owners unassigned. Cross-cutting API proposal with Swipe as the first feature slice.
+## What we are building
 
-## Problem / Goals / Non-goals
+A versioned response envelope and a typed iOS factory. The backend returns approved content types; iOS maps them into native models and views. The backend owns eligibility, scores, permissions and decision outcomes. iOS owns layout, gestures, localization and navigation.
 
-Give iOS one predictable translation boundary between BFF responses and feature models. Prevent database rows, missing-data guesses and business rules from leaking into SwiftUI. “Factory” here means a typed response-to-model mapper; the Scout software factory must produce contract fixtures and paired iOS/backend work from this plan. It does not mean a backend-controlled SwiftUI layout engine.
+**First slice:** `swipe_stack`, `player_card`, `empty_state`, `decision_result`. Adding an unknown type must not crash older apps, but rendering a new type still requires client support. This proposal replaces the earlier draft's `schemaVersion/data/cards` envelope with `version/components` consistently in both plans.
 
-Start with Discovery; avoid a universal component registry, new Java deployment, client-side scoring or a rewrite of every Supabase call.
+[Design plan and screenshots — PR #1](https://github.com/22annajohnson/scout-planning/pull/1) · [Figma source](https://www.figma.com/design/qEktHx6Uo52KgAYNt4VHw3/Scout-V2?node-id=33-2)
 
-## Context / References
+## 1. Implementation inventory
 
-- [Scout V2 swipe design](https://www.figma.com/design/qEktHx6Uo52KgAYNt4VHw3/Scout-V2?node-id=33-2): identity, photos, score, vibe, availability, stats and decisions are the first consumer.
-- The new planning/iOS/backend repos contain only READMEs. Names and contracts below are proposals, not existing implementations. Use legacy `implementation/proposed/` and the tech-plan template's relevant sections until V2 conventions exist.
-- Reconcile legacy ScoutSports `Scout/docs/architecture/API_BOUNDARIES.md` and approved Discovery/Profile domain guidance before implementation. This proposal does not silently supersede them. V2 foundation/roadmap/Jira references are not assigned yet.
-- [Supabase Edge Functions](https://supabase.com/docs/guides/functions), [function authentication](https://supabase.com/docs/guides/functions/auth), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security): TypeScript/Deno runtime and caller-authorized data access are available foundations.
+**Ready to go:** reuse as-is. **Modification needed:** change an existing type. **New:** proposed type to build. Existing names below were inspected in the local ScoutSports source; they are not yet ported into the README-only V2 repos. No BFF adapter is ready to reuse as-is.
 
-## Architecture / Ownership
+| Status | Actual existing name → planned name | iOS work | Backend work |
+| --- | --- | --- | --- |
+| New | `BFFEnvelopeDTO`, `BFFComponentDTO` (proposed) | Decode `version`, `requestId`, `components`; typed discriminators with unknown case | Publish versioned schema and fixtures |
+| New | `BFFClient` (proposed) | Authenticated transport, HTTP errors, cancellation, bounded retries | Authenticated Edge Function routes |
+| Modification needed | `SwipeCardProviding` → `SwipeCardProviding` | Replace `fetchSwipeCandidates() → SwipeCandidateBatch` with paged typed-model result; add decision method; update mocks | Ordered cards, cursor and decision response |
+| New | `BFFDiscoveryRepository` (proposed) | Implement `SwipeCardProviding`; transport → DTO → factory; preserve request generation | Privacy-safe projection; no SQL rows in response |
+| New | `SwipeResponseFactory`, `PlayerCardModel`, `SwipeStackModel`, `EmptyStateModel`, `DecisionResultModel` (proposed) | Pure, testable DTO-to-model mapping; no networking | Stable type names and explicit unavailable states |
+| Modification needed | `SwipeDeckViewModel`, `PlayerSwipeCardViewModel`, `CardViewModel` | Consume typed models; remove BFF-path dependence on `SwipeRankingContext` and `toCardViewModel()`; support pending/retry/page states | Server-owned ordering, scores and outcomes |
+| Ready to go | `ScoutStateCard` | Reuse existing loading/empty/error view with localized mapped copy and retry closure | `empty_state.reason`; HTTP errors map locally |
 
-`SwiftUI → @MainActor feature model → DiscoveryRepository → BFFClient → DTO decoder → DiscoveryCardFactory → domain/presentation model`
+Source: `Scout/Scout/Swipe/{Data,ViewModels,Models}` and `Scout/ScoutDesign/Sources/ScoutDesign/Components/ScoutStateCard.swift`; inspected baseline `0a5a5620de5d7adf8df11069acb0aa278c32ca29`. “Ready” applies to this fallback view's existing behavior, not proof of V2 integration or Figma visual parity.
 
-| Layer | Owns | Must not own |
-| --- | --- | --- |
-| Backend domain services | Eligibility, rank, fit/score calculations, visibility, decision/match semantics | iOS layout or navigation state |
-| Edge Function BFF | Authenticated orchestration, privacy-safe projection, contract validation, HTTP errors | Duplicated domain rules per screen |
-| BFFClient / repository | Session token, transport, decoding, pagination, cancellation, retry coordination | View construction |
-| Pure factory | Validated DTO → typed model; explicit absent/unknown/error handling | Networking, persistence, ranking, match creation |
-| Feature view model / SwiftUI | Loading/pending/error state, locale formatting, photo/day/menu selection, native rendering | Raw JSON, SQL rows, permission decisions |
+## 2. Contract-to-iOS mapping
 
-Use Supabase Postgres/Auth/Storage and thin TypeScript Edge Functions initially. SQL constraints/transactions enforce integrity; services own business policy. Direct Supabase access can remain for simple authorized operations behind repositories. Only the selected BFF feature moves to the new boundary.
+| BFF response | Factory output (proposed) | iOS consumer (existing) | Failure behavior | Backend requirement |
+| --- | --- | --- | --- | --- |
+| `swipe_stack` | `SwipeStackModel` | `SwipeDeckViewModel` → `SwipeDeckView` | Skip unsupported optional items; malformed required known card fails page | Ordered `cards`, explicit nullable `nextCursor` |
+| `player_card` (nested in stack) | `PlayerCardModel` | `PlayerSwipeCardViewModel` → `PlayerSwipeScrollView` | Keep valid card when optional section fails; reject missing ID/identity | Stable ID/revision; typed privacy-safe fields |
+| `empty_state` | `EmptyStateModel` | `SwipeDeckViewModel` → `ScoutStateCard` | Unknown reason uses local generic empty copy | Explicit reason; not an error disguised as empty |
+| `decision_result` | `DecisionResultModel` | `SwipeDeckViewModel` | Unknown outcome stops automatic navigation and triggers reconciliation | Durable decision ID, candidate ID, authoritative outcome |
+| Unknown `type` | `UnsupportedComponent` (proposed mapping result) | No view; redacted diagnostic | Skip optional unknown item; all-unknown response shows unsupported/retry, never empty | Additive types cannot replace required content for supported clients |
 
-## API / Backend Requirements
+## 3. Response examples
 
-Proposed logical routes: `GET /v1/discovery/cards?cursor=…&sportId=…` and `POST /v1/discovery/decisions`; map them under a deployed Edge Function route during implementation. Publish the exact paths in a versioned OpenAPI/JSON Schema contract in `scout-backend` with shared JSON fixtures. Generated database types are not the public DTO contract.
+All examples are **proposed JSON**, not deployed APIs. IDs/media and unavailable metrics are fixtures. `components` is a typed content list, not instructions to execute code, load arbitrary views or navigate to arbitrary URLs.
 
-Success envelope: required `schemaVersion: 1`, `requestId`, `data`; page data contains `cards` and nullable `nextCursor`. Error envelope: `schemaVersion`, `requestId`, `error: {code, message, retryable}` with meaningful HTTP status. Do not return HTTP 200 for failure. Proxy/network failures may not contain JSON; iOS must handle those too.
+### Discovery envelope + swipe stack + player card
 
-| Card field | Contract / interpretation |
+`GET /v1/discovery/cards?sportId=tennis&cursor=…` (logical route; deploy under the chosen Edge Function path).
+
+```json
+{
+  "version": 1,
+  "requestId": "req_123",
+  "components": [{
+    "type": "swipe_stack",
+    "id": "deck_123",
+    "payload": {
+      "cards": [{
+        "type": "player_card",
+        "id": "player_123",
+        "payload": {
+          "revision": "r1",
+          "identity": {"displayName": "Maya", "age": 28, "sportId": "tennis"},
+          "photos": [],
+          "distance": {"state": "approximate", "value": 2, "unit": "mi"},
+          "scoutScore": {"state": "unavailable"},
+          "communityRatings": [],
+          "vibe": {"state": "insufficient", "reviewCount": 0, "traits": []},
+          "availability": {"state": "available", "timeZone": "America/New_York", "windows": []},
+          "stats": {"format": "doubles", "gamesPlayed": 0, "attendancePercent": null},
+          "highlights": [],
+          "bio": null,
+          "allowedActions": ["pass"]
+        }
+      }],
+      "nextCursor": null
+    }
+  }]
+}
+```
+
+`player_card.id` is the candidate ID; do not duplicate it in `payload`. Exactly one recognized `swipe_stack` or `empty_state` is required for a discovery response. A stack's `cards` must contain at least one supported valid card; exhaustion is `empty_state`. `player_card` is not valid at the envelope root in v1. Reject duplicate IDs. `nextCursor: null` ends pagination. For a later empty page, preserve already loaded cards and stop pagination.
+
+### Empty deck
+
+```json
+{
+  "version": 1,
+  "requestId": "req_124",
+  "components": [{
+    "type": "empty_state",
+    "id": "discovery_empty",
+    "payload": {"reason": "no_candidates"}
+  }]
+}
+```
+
+Reason codes: `no_candidates`, `filters_too_narrow`, `exhausted`. iOS supplies localized title/message and an allowlisted retry/filter action. Backend errors never become `empty_state`.
+
+### Decision request and result
+
+`POST /v1/discovery/decisions`; retries after a lost response use the **same** idempotency key.
+
+```json
+{
+  "candidateId": "player_123",
+  "candidateRevision": "r1",
+  "action": "pass",
+  "idempotencyKey": "decision_123"
+}
+```
+
+```json
+{
+  "version": 1,
+  "requestId": "req_125",
+  "components": [{
+    "type": "decision_result",
+    "id": "decision_123",
+    "payload": {"candidateId": "player_123", "outcome": "passed"}
+  }]
+}
+```
+
+Exactly one recognized `decision_result` is required for this route. `invite` and `connect` use the same request shape, with approved invitation context when needed. Their outcome enums and optional invitation/match IDs require domain approval; neither action implies immediate match creation. The example outcome `passed` is proposed too.
+
+### Error envelope (HTTP 409 example)
+
+```json
+{
+  "version": 1,
+  "requestId": "req_126",
+  "error": {"code": "stale_candidate", "message": "Refresh this player before acting.", "retryable": false}
+}
+```
+
+Success has `components`; failure has `error`, never both. HTTP status remains authoritative. Localize by stable error code; tolerate HTML/empty proxy failures without JSON decoding crashes.
+
+## 4. Field rules
+
+| Field | Requirement |
 | --- | --- |
-| `id`, `revision`, `identity` | Required stable candidate ID, revision, name and sport ID; optional age/intro/skill value with system and provenance. No DOB. |
-| `photos[]` | Ordered stable photo IDs, authorized HTTPS URLs and optional expiry. Empty array is valid; never synthesize photos. |
-| `distance` | Explicit hidden/unavailable/approximate state; approximate value + unit only, no coordinates. |
-| `scoutScore` | Available with value 0–100 + calculation version, or unavailable; distinct from internal ranking. |
-| `vibe` | Available/insufficient/unavailable state, fit code, explanation, personality codes, review count and selected traits. Backend selects traits and owns approved scale definitions/confidence. |
-| `availability` | Available/unavailable state; dated overlap intervals with UTC instants, viewer IANA zone and optional viewer-only windows. Empty overlaps mean no shared time. No other player's full schedule. |
-| `stats`, `highlights`, `bio` | Nullable metrics with units/denominators, stable highlight types and optional text. Unknown differs from zero. |
-| `allowedActions[]` | Recognized `pass`, `invite`, `connect`; an empty list disables decisions. Permission is rechecked server-side. |
+| Identity / media | Required name + sport ID + revision; optional age/intro/skill system/value/provenance. Ordered photo IDs + authorized HTTPS URLs/expiry. Empty media renders placeholder. No DOB. |
+| Distance / score / ratings | Explicit hidden/unavailable states; approximate units only. Public score 0–100 with calculation version when available; ratings include scale and sample count. No client scoring, no default sample numbers. |
+| Vibe | Backend-selected fit/personality codes, traits with approved scale and confidence, review count. Unknown optional trait/tag is omitted. |
+| Availability | Dated UTC start/end instants + viewer IANA zone; `windows` means shared overlap only. Optional `viewerWindows` may show the viewer's own time. No other player's schedule. Empty available list means no overlap; unavailable means unknown. |
+| Stats / highlights / bio | Null means unknown; zero is real data. Attendance includes denominator when available. Stable highlight kinds and optional bio. |
+| Allowed actions | Recognized `pass`, `invite`, `connect`; empty list disables actions. Unknown actions hidden. Server rechecks authorization. |
 
-Optional sections must have defined schemas and state discriminators; they are not arbitrary dictionaries. Define maximum page size, media count and text lengths in the approved contract. Bind opaque cursors to viewer, filters and ordering snapshot; reject expired/mismatched cursors with a restartable error. Do not share discovery responses across accounts.
+Full populated field examples are in [design PR #1](https://github.com/22annajohnson/scout-planning/pull/1). Commit canonical schemas/fixtures to `scout-backend` during implementation; pin that version in iOS. Database-generated types are not the public contract.
 
-Decision request: `{candidateId, candidateRevision, action, idempotencyKey, invitationContext?}`. Response: `{decisionId, outcome, candidateId, invitationId?, matchId?}` inside the success envelope. Approve the outcome enum and Invite/Connect domain semantics before implementation; clients navigate only from a recognized authoritative outcome. Scope idempotency to actor/key, store payload hash/result, replay identical requests, reject key reuse with changed payload (409), and atomically enforce decision/match uniqueness. A retry after a lost response uses the same key.
+## 5. Implementation checklist
 
-Authenticate JWTs and derive viewer identity from the verified token. Use caller-scoped RLS for reads; authorize privileged operations explicitly. Recheck blocks, candidate visibility and action eligibility on writes. No service credentials, precise locations, hidden schedules or raw reviews in the app. Redact logs; retain request IDs, latency and stable error codes.
+### Backend
 
-## iOS Factory / Error Policy
+- [ ] Approve schemas, enum values, max page/media/text sizes and client-version support window; generate shared fixtures.
+- [ ] Verify JWT; derive viewer from token; apply caller-scoped RLS or explicitly authorize privileged operations. Recheck blocks/visibility/actions on writes.
+- [ ] Compute eligibility, ordering, fit/score, aggregates and overlaps server-side. Return only approved public fields.
+- [ ] Bind cursor to viewer/filter/snapshot; reject expired or mismatched cursors with restartable error. Never share account responses.
+- [ ] Scope idempotency by actor/key; replay identical requests, reject changed payload with same key (409). Enforce decision/match uniqueness atomically in Postgres.
+- [ ] Map fields to actual tables; propose only missing migrations, policies, indexes, retention/backfills. One Edge Function call alone does not make writes transactional.
 
-Implement `BFFEnvelope<T: Decodable>`, feature DTOs, `DiscoveryRepository` and a pure `DiscoveryCardFactory`. Decode DTOs off the main thread; publish UI state on the main actor. Inject transport and factory for fixtures. Views receive typed models, not DTOs. Keep photo/day/menu selection local and keyed by candidate ID; discard stale results when account/filter/request generation changes.
+### iOS
 
-| Input / failure | Required behavior |
-| --- | --- |
-| Unknown additive JSON key | Ignore; backward compatible within v1 |
-| Unsupported envelope version / malformed required card ID or identity | Fail the response visibly with retry/update state; log redacted contract error, never silently show an empty deck |
-| Missing/null optional metric | Show unavailable or omit the section; never replace with 0, an invented score or fixture text |
-| Malformed optional section / out-of-range score | Suppress that section with a recorded mapping error; do not clamp bad server data into credibility |
-| Unknown optional trait/tag/highlight kind | Omit unsupported item; preserve the rest of the card |
-| Unknown action / decision outcome | Hide unknown action; stop automatic outcome navigation and refresh/reconcile after a submitted decision |
-| Invalid/expired media URL | Placeholder; repository refreshes authorized URL when appropriate; factory never fetches it |
-| Empty valid `cards` | Empty-deck state, not a parsing error |
-| 401 | Refresh session once, replay only with safe/idempotent semantics; then request sign-in |
-| 403/404 candidate unavailable; 409 stale revision | Disable stale action and refresh/reconcile; do not claim success |
-| 429 / transient 5xx / timeout | Bounded backoff with jitter and Retry-After; automatic reads only, writes require same idempotency key |
-| Offline | Preserve only authorized in-memory display, show stale/offline state, disable decisions; no durable offline decision queue in v1 |
+- [ ] Implement `BFFClient` → `BFFDiscoveryRepository` → `SwipeResponseFactory`; publish mapped state on the main actor.
+- [ ] Decode `type` first. Decode each optional section independently so a malformed optional value cannot fail the entire synthesized `Decodable` card. Unknown payloads must not be decoded as known DTOs.
+- [ ] Preserve photo/day/menu/scroll state by candidate ID; cancel or ignore stale account/filter requests.
+- [ ] Use memory-only account-scoped cache; clear on sign-out. Offline display is stale and actions are disabled; no durable offline decision queue.
+- [ ] Unknown version or malformed required card fails visibly. Suppress malformed optional section with diagnostic; never turn a bad page into “no players.” Do not clamp invalid scores into valid-looking data.
+- [ ] Refresh session once on 401; then sign-in. On 403/404 or stale 409, disable stale action and reconcile. Bound retries for 429/5xx/timeouts; honor Retry-After. Writes only retry with original idempotency key.
 
-Factory maps semantic values; locale-aware dates, time zones, units and accessible strings belong to presentation formatting. Clear account-scoped memory on sign-out/account switch. Proposal: memory-only card cache for v1; persisted sensitive profiles require separate retention approval.
+## 6. Delivery and acceptance
 
-## Database Changes / Dependencies / Open Questions
+- [ ] **Approve:** BFF adoption, availability privacy, score/trait definitions, Invite/Connect semantics and compatibility window.
+- [ ] **Contract first:** canonical populated/empty/partial/unknown/error fixtures and schema validation; then separate small backend and iOS tickets.
+- [ ] **Verify:** factory output, wrong versions, unknown types, all-unknown page, invalid required/optional fields, null versus zero, expired media and DST; auth isolation, block checks, pagination, concurrent duplicate writes and lost-response retry.
+- [ ] **Release:** compatible backend first → flagged iOS cohort → monitor latency/errors/decoding/duplicate decisions → expand. Rollback disables feature while retaining API support for released apps.
+- [ ] **Done:** approved decisions, linked tickets, provider/consumer/security checks, accessible UI fallback and human sign-off. No tickets or production changes in this PR.
 
-No migration is part of this PR. Backend implementation must map approved source tables, identify required aggregate/read models, and propose only missing persistence for idempotency/decisions. Migrations must include RLS, uniqueness, indexes, retention and rollback/backfill requirements. A single Edge Function call is not automatically a transaction; use a transactional database operation for coupled writes.
+## Reference and convention notes
 
-Approve BFF adoption, public score and trait semantics, availability privacy, Invite versus Connect, API version support window and deployment target before dependent implementation. Prefer fixed typed feature contracts; revisit server-driven section composition only if a real release requirement justifies it.
+Thin TypeScript Supabase Edge Functions are proposed; Postgres/Auth/Storage stay authoritative. Simple authorized CRUD can remain behind existing repositories. See [Edge Functions](https://supabase.com/docs/guides/functions), [authentication](https://supabase.com/docs/guides/functions/auth) and [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
-## Software Factory Deliverables / Milestones
-
-1. **Contract first:** approve schemas, field-source/privacy mapping, statuses and errors; commit valid, empty, partial, unknown-enum and failure fixtures. Keep one canonical fixture set; pin its version in both repos.
-2. **Backend:** implement projection + decision handler; validate emitted responses against schema; add auth/RLS, exclusion, idempotency and transaction tests.
-3. **iOS:** implement client/repository/factory against those fixtures; integrate one swipe screen and accessible fallback states. Do not generate one Swift view per database table.
-4. **Integration:** CI consumes the same fixture version on both sides; contract-breaking changes require a new version and coordinated rollout. Create separate small backend/iOS tickets only after approval.
-
-## Testing / Rollout / Definition of Done
-
-Contract tests cover populated/empty/partial cards, wrong version, unknown enums, malformed required versus optional fields, null versus zero, expired media and date/DST cases. Integration tests cover account isolation, private-field absence, blocked candidates, paging/filter changes, duplicate and concurrent writes, lost-response retry and token expiry. UI tests cover pending/retry/empty states and preserving navigation state without duplicating decisions.
-
-Deploy compatible backend contracts first, enable the iOS feature flag for a small cohort, monitor latency/HTTP errors/decode failures/duplicate decisions with request IDs, then expand. Rollback disables the feature or restores a compatible deployment; keep the supported API alive for released apps. No destructive migration rollback.
-
-Done: approved contract and domain decisions; linked tickets implemented; shared fixtures and provider/consumer/security tests pass; old supported client contract still works; no raw response handling in views; rollout and human review complete. This PR changes documentation only; no tests or CI are configured in the planning repo. Jira breakdown follows approval.
+Uses legacy Scout `implementation/proposed/` convention; V2 has no template or CI. Reconcile with legacy `Scout/docs/architecture/API_BOUNDARIES.md` and approved Discovery/Profile domain guidance before tickets. V2 roadmap/owners remain unassigned. Documentation validation only; no app tests needed for this PR.
