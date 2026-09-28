@@ -1,0 +1,91 @@
+name: Repository Validation
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Repository change detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs: ${{ steps.changes.outputs.should-run-docs }}
+      config: ${{ steps.changes.outputs.should-run-config }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect changes
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/ci-changes.py
+
+  docs:
+    name: Documentation checks
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate Markdown
+        run: ruby .github/scripts/validate-markdown.rb
+
+  config:
+    name: YAML and CI checks
+    needs: changes
+    if: needs.changes.outputs.config == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate workflow YAML
+        run: ruby .github/scripts/validate-yaml.rb
+      - name: Test CI guards
+        run: python3 -m unittest discover -s .github/tests -v
+
+  required:
+    name: Repository validation
+    if: always()
+    needs: [changes, docs, config]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        env:
+          DETECTION: ${{ needs.changes.result }}
+          DOCS_REQUIRED: ${{ needs.changes.outputs.docs }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          CONFIG_REQUIRED: ${{ needs.changes.outputs.config }}
+          CONFIG_RESULT: ${{ needs.config.result }}
+        run: |
+          test "$DETECTION" = success
+          check_result() {
+            if [ "$1" = true ]; then
+              test "$2" = success
+            else
+              test "$1" = false
+              test "$2" = skipped
+            fi
+          }
+          check_result "$DOCS_REQUIRED" "$DOCS_RESULT"
+          check_result "$CONFIG_REQUIRED" "$CONFIG_RESULT"

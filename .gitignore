@@ -1,0 +1,3 @@
+# Local Python validation output
+__pycache__/
+*.pyc

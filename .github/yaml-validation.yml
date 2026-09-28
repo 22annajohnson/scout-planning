@@ -1,0 +1,12 @@
+include:
+  - "**/*.yml"
+  - "**/*.yaml"
+  - ".github/**/*.yml"
+  - ".github/**/*.yaml"
+exclude:
+  - "**/build/**"
+  - "**/target/**"
+  - "**/node_modules/**"
+rules:
+  require_valid_yaml: true
+  validate_github_workflow_shape: true

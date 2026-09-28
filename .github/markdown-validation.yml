@@ -1,0 +1,13 @@
+include:
+  - "**/*.md"
+  - ".github/**/*.md"
+exclude:
+  - "**/.build/**"
+  - "**/build/**"
+  - "**/target/**"
+  - "**/DerivedData/**"
+  - "**/node_modules/**"
+rules:
+  require_utf8: true
+  reject_conflict_markers: true
+  require_balanced_fences: true
