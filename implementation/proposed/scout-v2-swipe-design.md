@@ -163,10 +163,10 @@ The same key is reused on retry. Invite/Connect outcomes and required invitation
 
 ### Backend
 
-- [ ] Supply endpoint-specific ordered component trees through a thin TypeScript Supabase BFF. Compile versioned tab/card templates against client-supported component versions; contract details in PR #2.
+- [ ] Supply endpoint-specific ordered component trees through a Java Spring Boot BFF backed by Supabase. Compile versioned tab/card templates against client-supported component versions; contract and runtime boundaries in [the BFF plan](bff-response-factory.md).
 - [ ] Resolve photo-order policy on the server; pin order per deck session and return stable photo IDs/assignment metadata for exposure attribution.
 - [ ] Own eligibility, exclusions, scoring, fit, selected traits, feedback confidence and timezone-safe overlap computation. Do not ship Figma sample values as defaults.
-- [ ] Authenticate caller; enforce RLS/privacy; expose authorized media, approximate location and shared time only. Recheck visibility/blocks/permissions when acting.
+- [ ] Authenticate caller; enforce ownership/privacy in Java (JDBC does not inherit caller RLS); expose authorized media, approximate location and shared time only. Recheck visibility/blocks/permissions when acting.
 - [ ] Make decisions idempotent; return authoritative outcomes. Use transactional uniqueness for decisions/matches.
 - [ ] Map fields to approved source tables. Propose missing migrations, indexes, policies and backfills separately; no schema changes in this PR.
 
