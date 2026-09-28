@@ -1,6 +1,6 @@
 # Tech Plan: Component-driven BFF and iOS Factory
 
-**Status:** Proposed · **Author:** Stephan · **First slice:** Swipe · **Scope:** endpoint templates, Supabase BFF and native iOS component registry.
+**Status:** Proposed · **Author:** Stephan · **First slice:** Swipe · **Scope:** endpoint templates, Spring Boot BFF with Supabase and native iOS component registry.
 
 ## 1. What we are building
 
@@ -17,7 +17,7 @@ This replaces the previous fixed `player_card.payload` proposal. There are two c
 
 ## 2. Endpoint templates
 
-Logical routes below are proposals; publish their deployed Edge Function paths in the API contract. One endpoint composes many components; do not create one network request per visual component.
+Logical routes below are proposals; publish their Spring Boot base URL and paths in the API contract. One endpoint composes many components; do not create one network request per visual component.
 
 | Endpoint | Template | Response root / responsibility |
 | --- | --- | --- |
@@ -171,7 +171,7 @@ Decision success uses `result`; UI success uses `template/components`; failure u
 
 - [ ] Version component JSON Schemas + tab/card templates + canonical fixtures; define allowed child slots, variants, limits, action codes and required fields.
 - [ ] Build template compiler over privacy-safe domain projections; resolve photo ordering and return component-capability-compatible responses. Validate output before sending.
-- [ ] Verify JWT, caller RLS and visibility/block rules for both tab and direct card endpoints. Return authorized media, approximate location and shared availability only; no DOB, raw reviews or another player's calendar.
+- [ ] Verify Supabase JWTs and enforce caller ownership, visibility/block rules in Java for both tab and direct card endpoints. Return authorized media, approximate location and shared availability only; no DOB, raw reviews or another player's calendar.
 - [ ] Own eligibility, ranking, public score, feedback confidence and overlap computations. Keep absent metrics unavailable. Bind cursors to viewer/filters/session/template revision; restart safely when a revision becomes incompatible.
 - [ ] Propose only missing migrations for decisions/idempotency/experiment exposure; include retention, policies, indexes and rollback. Template config stays versioned in code initially.
 
@@ -254,7 +254,7 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 | --- | ---: | --- |
 | [BE] Implement numeric and session-stable random ordering | 0.75 | Stable photo IDs, position tie-breaks, seeded session ordering and retry fixtures. |
 | [BE] Add experiment assignment and policy fallback | 1 | Stable variant resolver, opaque assignment token and numeric fallback/disable behavior. |
-| [BE] Add exposure storage and ingestion | 1.5 | Reviewed migration, authenticated ingestion, deduplication, retention and RLS tests. |
+| [BE] Add exposure storage and ingestion | 1.5 | Reviewed migration, authenticated ingestion, deduplication, retention and cross-user authorization tests. |
 | [iOS] Report actual photo exposure | 0.75 | Visibility-based events with photo/position/session token; avoid payload-delivery counts. |
 | [BE] Add assignment-to-outcome attribution | 1 | Join authorized exposure/assignment to durable decision/match IDs; basic metric query and fixtures. |
 
@@ -273,6 +273,27 @@ This plan owns V2 app/bootstrap/session/CI foundations, shared BFF/registry infr
 
 ## References and conventions
 
-Proposal: thin TypeScript Supabase Edge Functions over Postgres/Auth/Storage; see [Edge Functions](https://supabase.com/docs/guides/functions), [authentication](https://supabase.com/docs/guides/functions/auth), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security). Future simple authorized CRUD should also use repository boundaries.
+Runtime decision: a Java 21 / Spring Boot BFF hosted as a separate service, backed by Supabase Postgres/Auth/Storage. Supabase Edge Functions are not the Java runtime and are not required for this slice. Feature contracts and domain rules above remain proposed.
 
-Uses legacy `implementation/proposed/`; V2 has no template or CI. Reconcile legacy `Scout/docs/architecture/API_BOUNDARIES.md` and Discovery/Profile guidance before implementation. Roadmap/implementation owners remain unassigned. Documentation validation only; no app tests required for this PR.
+### Runtime and trust boundaries
+
+1. iOS signs in and refreshes its session through Supabase Auth using the project URL and publishable key.
+2. iOS sends the access token to Spring Boot as `Authorization: Bearer <token>`.
+3. Spring Security validates the signature against the project's JWKS, exact issuer, `authenticated` audience, expiry, authenticated role and user subject. Use asymmetric signing keys (ES256 or RS256); do not distribute the JWT signing secret. Legacy HS256 projects must migrate signing keys before this integration.
+4. Java controllers call domain services and repositories. The BFF compiles the component response and owns eligibility, ranking, privacy, blocks and idempotency. Add packages by domain as features land; do not put business logic in controllers.
+5. Repositories use JDBC to Supabase PostgreSQL. Keep business tables in an unexposed `app` schema and use a restricted runtime role. Use the direct connection or session pooler with TLS and a bounded pool.
+6. Supabase Storage can hold media; the BFF authorizes access before issuing short-lived URLs. Storage integration is a later feature, not part of the initial Java scaffold.
+
+**JDBC authorization:** JWT verification does not populate `auth.uid()` on JDBC connections. Java must enforce ownership and cross-user access rules on every query and mutation. Do not claim caller RLS protects ordinary JDBC queries. If an endpoint later uses the Supabase Data API with a user's JWT, define and test its RLS policies separately. Never use a service-role key in iOS; privileged keys bypass RLS and are not needed for the initial JDBC/JWKS integration.
+
+### Foundation and delivery order
+
+- Bootstrap Maven/Java, health probes, stateless JWT validation and Java build/test CI in `scout-backend`.
+- Configure a Supabase project and separate Java hosting. Keep credentials in local environment files or hosting secrets. Use separate non-production and production projects.
+- Before the first persisted feature, add reviewed versioned migrations, an unexposed schema, separate migration-owner/runtime roles and cross-user authorization integration tests. Do not auto-update schema at application startup or modify Supabase-managed `auth`/`storage` schemas.
+- Publish the versioned contract and fixtures, then implement one authenticated Swipe read path end to end. Bootstrap `/v1/session` is a diagnostic, not the component envelope contract.
+- Add writes, idempotency and remaining features after that slice passes. Provisioning, production deployment and feature migrations are follow-up work; the Java scaffold alone does not make every dependent ticket ready.
+
+References: [Supabase with Spring Boot](https://supabase.com/docs/guides/getting-started/quickstarts/spring-boot), [Supabase signing keys](https://supabase.com/docs/guides/auth/signing-keys), [Spring Security JWT resource server](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html), [securing Supabase data](https://supabase.com/docs/guides/database/secure-data).
+
+Uses `implementation/proposed/`; repository PR templates and documentation CI are available. Reconcile legacy `Scout/docs/architecture/API_BOUNDARIES.md` and Discovery/Profile guidance before implementation. Roadmap/implementation owners remain unassigned. Documentation validation only; no app tests required for this PR.

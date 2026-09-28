@@ -149,7 +149,7 @@ Validate locally for feedback and independently on the server. Name rules must s
 ### Backend
 
 - [ ] Define versioned schemas/templates for welcome/basics/location/sport/photo/ready, catalog and validation rules; compile only compatible components and return saved-state values.
-- [ ] Add minimal per-account draft/progress persistence, owner-only access/RLS, optimistic revisions and atomic idempotent transitions; reject skipped prerequisites and cross-account access. Keep draft state separate from the published profile.
+- [ ] Add minimal per-account draft/progress persistence, owner-only authorization in Java (JDBC does not inherit caller RLS), optimistic revisions and atomic idempotent transitions; reject skipped prerequisites and cross-account access. Keep draft state separate from the published profile.
 - [ ] At completion project essentials, optional area/cover and explicit unrated state into the starter profile atomically. Repeated completion returns the same outcome; GET reports completed even if the response was lost.
 - [ ] Implement owned media upload/finalize and cleanup; define private location precision/retention and public distance projection. Do not put raw location/name/age/photo URLs in logs or analytics.
 - [ ] Enforce downstream eligibility separately. Skipping optional fields must allow exploration; whether an incomplete profile can appear in results or send invites needs an explicit domain rule.
